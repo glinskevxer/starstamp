@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from starstamp.model.owner import OwnerAccount
+from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book, open_book
 from starstamp.store.migrations import migrate
 from starstamp.store.owners import OwnerRepository
@@ -25,3 +26,8 @@ def owners(book: Book) -> OwnerRepository:
         OwnerAccount(code="WELD1", name="Cascade Welding Supply", opened_on=date(2019, 4, 1))
     )
     return repository
+
+
+@pytest.fixture
+def cylinders(book: Book, owners: OwnerRepository) -> CylinderRepository:
+    return CylinderRepository(book.connection)
