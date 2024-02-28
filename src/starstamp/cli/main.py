@@ -1,0 +1,101 @@
+"""The starstamp command line."""
+
+from __future__ import annotations
+
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+import click
+
+from starstamp import __version__
+from starstamp.cli.context import ShopContext, pass_shop
+from starstamp.errors import (
+    ConflictError,
+    NotFoundError,
+    RuleViolationError,
+    StarstampError,
+    ValidationError,
+)
+
+EXIT_CODES: dict[type[StarstampError], int] = {
+    ValidationError: 2,
+    NotFoundError: 3,
+    ConflictError: 4,
+    RuleViolationError: 5,
+}
+
+
+@click.group()
+@click.version_option(__version__, prog_name="starstamp")
+@click.option(
+    "--book",
+    "book_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default="shop.sqlite3",
+    show_default=True,
+    envvar="STARSTAMP_BOOK",
+    help="the SQLite file this shop keeps its records in",
+)
+@click.option(
+    "--today",
+    "today",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="pretend the day is this one, for backdated paperwork",
+)
+@click.pass_context
+def cli(context: click.Context, book_path: Path, today: datetime | None) -> None:
+    """Records for a cylinder requalification shop."""
+    context.obj = ShopContext(book_path=book_path, today=(today.date() if today else date.today()))
+
+
+@cli.command()
+@pass_shop
+def init(shop: ShopContext) -> None:
+    """Create the book, or bring an existing one up to the current schema."""
+    applied = shop.initialise()
+    if applied:
+        for name in applied:
+            click.echo(f"applied {name}")
+    else:
+        click.echo("already current")
+
+
+@cli.command()
+@pass_shop
+def about(shop: ShopContext) -> None:
+    """Say what book is open and what is in it."""
+    from starstamp.store.migrations import schema_version
+
+    click.echo(f"book {shop.book_path}")
+    if not shop.book_path.exists():
+        click.echo("no book yet")
+        return
+    with shop.open() as handle:
+        click.echo(f"schema version {schema_version(handle.connection)}")
+        count = handle.connection.execute("SELECT count(*) FROM cylinder").fetchone()[0]
+        click.echo(f"{count} cylinders")
+
+
+def run() -> int:
+    """The console entry point, which turns domain errors into exit codes."""
+    try:
+        cli.main(standalone_mode=False)
+    except click.ClickException as exc:
+        exc.show()
+        return exc.exit_code
+    except click.Abort:
+        click.echo("aborted", err=True)
+        return 130
+    except StarstampError as exc:
+        click.echo(f"error: {exc}", err=True)
+        for kind, code in EXIT_CODES.items():
+            if isinstance(exc, kind):
+                return code
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run())
