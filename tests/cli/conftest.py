@@ -19,7 +19,7 @@ def run(book_path: Path) -> Invoke:
     runner = CliRunner()
 
     def invoke(*args: str, expect: int = 0) -> Result:
-        result = runner.invoke(cli, ["--book", str(book_path), *args], catch_exceptions=False)
+        result = runner.invoke(cli, ["--book", str(book_path), *args])
         assert result.exit_code == expect, result.output
         return result
 

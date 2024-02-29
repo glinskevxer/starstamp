@@ -5,8 +5,14 @@ import pytest
 from click.testing import CliRunner
 
 from starstamp.cli.context import ShopContext
-from starstamp.cli.main import cli, run
-from starstamp.errors import NotFoundError
+from starstamp.cli.main import cli, exit_code_for, run
+from starstamp.errors import (
+    ConflictError,
+    NotFoundError,
+    RuleViolationError,
+    StarstampError,
+    ValidationError,
+)
 
 from .conftest import Invoke
 
@@ -100,3 +106,18 @@ def test_a_bad_option_is_a_click_error(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_today_can_be_pinned(shop: Invoke) -> None:
     result = shop("--today", "2024-05-04", "about")
     assert result.exit_code == 0
+
+
+def test_domain_errors_become_exit_codes() -> None:
+    assert exit_code_for(ValidationError("bad")) == 2
+    assert exit_code_for(NotFoundError("gone")) == 3
+    assert exit_code_for(ConflictError("twice")) == 4
+    assert exit_code_for(RuleViolationError("no", "180.205")) == 5
+    assert exit_code_for(StarstampError("something else")) == 1
+
+
+def test_the_error_is_printed_with_a_prefix(book_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--book", str(book_path), "account", "show", "nope"])
+    assert result.exit_code == 3
+    assert "error: no book" in result.output

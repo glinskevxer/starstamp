@@ -9,6 +9,7 @@ from pathlib import Path
 import click
 
 from starstamp import __version__
+from starstamp.cli.accounts import account
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.errors import (
     ConflictError,
@@ -18,15 +19,49 @@ from starstamp.errors import (
     ValidationError,
 )
 
-EXIT_CODES: dict[type[StarstampError], int] = {
-    ValidationError: 2,
-    NotFoundError: 3,
-    ConflictError: 4,
-    RuleViolationError: 5,
-}
+EXIT_CODES: tuple[tuple[type[StarstampError], int], ...] = (
+    (ValidationError, 2),
+    (NotFoundError, 3),
+    (ConflictError, 4),
+    (RuleViolationError, 5),
+)
 
 
-@click.group()
+def exit_code_for(error: StarstampError) -> int:
+    """Map a domain error onto the status the shop's batch files check."""
+    for kind, code in EXIT_CODES:
+        if isinstance(error, kind):
+            return code
+    return 1
+
+
+class ShopError(click.ClickException):
+    """A domain error on its way out through click, carrying its own status."""
+
+    def __init__(self, message: str, exit_code: int) -> None:
+        super().__init__(message)
+        self.exit_code = exit_code
+
+    def format_message(self) -> str:
+        return f"error: {self.message}"
+
+
+class ShopGroup(click.Group):
+    """The top level group, which is where domain errors become exit codes.
+
+    Doing this in the entry point instead would mean the tests exercise a
+    different path from the one the shop runs, and the exit codes are the part
+    the shop's batch files actually depend on.
+    """
+
+    def invoke(self, ctx: click.Context) -> object:
+        try:
+            return super().invoke(ctx)
+        except StarstampError as exc:
+            raise ShopError(str(exc), exit_code_for(exc)) from exc
+
+
+@click.group(cls=ShopGroup)
 @click.version_option(__version__, prog_name="starstamp")
 @click.option(
     "--book",
@@ -78,6 +113,9 @@ def about(shop: ShopContext) -> None:
         click.echo(f"{count} cylinders")
 
 
+cli.add_command(account)
+
+
 def run() -> int:
     """The console entry point, which turns domain errors into exit codes."""
     try:
@@ -90,10 +128,7 @@ def run() -> int:
         return 130
     except StarstampError as exc:
         click.echo(f"error: {exc}", err=True)
-        for kind, code in EXIT_CODES.items():
-            if isinstance(exc, kind):
-                return code
-        return 1
+        return exit_code_for(exc)
     return 0
 
 
