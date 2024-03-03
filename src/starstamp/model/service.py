@@ -69,7 +69,15 @@ HYDROGEN = _add(GasService("H2", "hydrogen", Hazard.FLAMMABLE))
 CARBON_DIOXIDE = _add(GasService("CO2", "carbon dioxide", Hazard.INERT, liquefied=True))
 NITROUS_OXIDE = _add(GasService("N2O", "nitrous oxide", Hazard.OXIDIZER, liquefied=True))
 ARGON_CO2 = _add(GasService("ARCO2", "argon carbon dioxide mix", Hazard.INERT))
-PROPANE = _add(GasService("LPG", "propane", Hazard.FLAMMABLE, liquefied=True))
+PROPANE = _add(
+    GasService(
+        "LPG",
+        "propane",
+        Hazard.FLAMMABLE,
+        liquefied=True,
+        requires_dedicated_cylinder=True,
+    )
+)
 ACETYLENE = _add(
     GasService(
         "C2H2",

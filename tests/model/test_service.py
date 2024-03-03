@@ -7,6 +7,7 @@ from starstamp.model.service import (
     CHLORINE,
     NITROGEN,
     OXYGEN,
+    PROPANE,
     Hazard,
     all_services,
     lookup_service,
@@ -64,3 +65,8 @@ def test_catalogue_is_not_tiny() -> None:
 
 def test_name_is_the_text_form() -> None:
     assert str(OXYGEN) == "oxygen"
+
+
+def test_propane_is_a_dedicated_service() -> None:
+    assert PROPANE.requires_dedicated_cylinder
+    assert PROPANE.is_dry_service
