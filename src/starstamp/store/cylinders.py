@@ -18,8 +18,10 @@ from starstamp.model.specification import parse_specification
 from starstamp.model.units import Expansion
 from starstamp.store.repository import (
     Repository,
+    as_day,
     as_int,
     as_optional_int,
+    as_optional_text,
     as_text,
     day_text,
 )
@@ -37,6 +39,8 @@ def row_to_cylinder(row: sqlite3.Row, owner_code: str) -> Cylinder:
         rejection_elastic_expansion=None if ree is None else Expansion(ree),
         water_capacity_tenths_l=as_optional_int(row["water_capacity_tenths_l"]),
         tare_hundredths_lb=as_optional_int(row["tare_hundredths_lb"]),
+        nominal_wall_thousandths_in=as_optional_int(row["nominal_wall_thousandths_in"]),
+        wall_source=as_optional_text(row["wall_source"]),
     )
 
 
@@ -54,8 +58,8 @@ class CylinderRepository(Repository):
                 "INSERT INTO cylinder (serial, manufacturer_symbol, spec_code, spec_family,"
                 " spec_marking, service_pressure_psig, permit_number, service_code, dom_year,"
                 " dom_month, ree_tenths_cc, water_capacity_tenths_l, tare_hundredths_lb,"
-                " owner_id, status, recorded_on)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " nominal_wall_thousandths_in, wall_source, owner_id, status, recorded_on)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     cylinder.key.serial,
                     cylinder.key.manufacturer_symbol,
@@ -72,6 +76,8 @@ class CylinderRepository(Repository):
                     else cylinder.rejection_elastic_expansion.tenths_cc,
                     cylinder.water_capacity_tenths_l,
                     cylinder.tare_hundredths_lb,
+                    cylinder.nominal_wall_thousandths_in,
+                    cylinder.wall_source,
                     owner_id,
                     cylinder.status.value,
                     day_text(recorded_on),
@@ -159,6 +165,40 @@ class CylinderRepository(Repository):
         if not cylinder.status.accepts_work:
             raise NotFoundError(f"{key} is {cylinder.status.value} and takes no more work")
         return cylinder
+
+    def record_wall(
+        self, key: CylinderKey, taken_on: date, thousandths_in: int, source: str, note: str | None
+    ) -> Cylinder:
+        """File a wall reading and carry the latest one onto the cylinder.
+
+        Readings accumulate because an ultrasonic sweep taken this year is
+        worth keeping beside the data sheet figure it disagrees with, and the
+        auditor asks which one was in force at the time of a test.
+        """
+        if thousandths_in <= 0:
+            raise ConflictError("a wall reading has to be a positive measurement")
+        cylinder_id = self.id_of(key)
+        self.connection.execute(
+            "INSERT INTO wall_reading (cylinder_id, taken_on, thousandths_in, source, note)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (cylinder_id, day_text(taken_on), thousandths_in, source, note),
+        )
+        self.connection.execute(
+            "UPDATE cylinder SET nominal_wall_thousandths_in = ?, wall_source = ? WHERE id = ?",
+            (thousandths_in, source, cylinder_id),
+        )
+        return self.by_key(key)
+
+    def wall_readings(self, key: CylinderKey) -> list[tuple[date, int, str]]:
+        rows = self._all(
+            "SELECT taken_on, thousandths_in, source FROM wall_reading"
+            " WHERE cylinder_id = ? ORDER BY taken_on, id",
+            (self.id_of(key),),
+        )
+        return [
+            (as_day(row["taken_on"]), as_int(row["thousandths_in"]), as_text(row["source"]))
+            for row in rows
+        ]
 
     def count(self) -> int:
         return self._count("SELECT count(*) FROM cylinder")

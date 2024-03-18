@@ -132,3 +132,32 @@ def test_a_condemned_cylinder_does_not_change_hands(
     cylinders.set_status(key, CylinderStatus.SCRAPPED)
     with pytest.raises(ConflictError, match="cannot change hands"):
         cylinders.transfer(key, owners.id_of("FIRE7"))
+
+
+def test_a_wall_reading_is_kept_and_carried_forward(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    key = CylinderKey.of("NCI", "A4471")
+    assert not cylinders.by_key(key).wall_is_known
+    updated = cylinders.record_wall(key, date(2024, 4, 2), 220, "data sheet", None)
+    assert updated.require_wall() == 220
+    assert updated.wall_source == "data sheet"
+
+
+def test_wall_readings_accumulate(cylinders: CylinderRepository, owners: OwnerRepository) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    key = CylinderKey.of("NCI", "A4471")
+    cylinders.record_wall(key, date(2024, 4, 2), 220, "data sheet", None)
+    cylinders.record_wall(key, date(2025, 4, 2), 214, "ultrasonic sweep", "three points")
+    readings = cylinders.wall_readings(key)
+    assert [reading[1] for reading in readings] == [220, 214]
+    assert cylinders.by_key(key).require_wall() == 214
+
+
+def test_a_wall_reading_has_to_be_a_measurement(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    with pytest.raises(ConflictError, match="positive measurement"):
+        cylinders.record_wall(CylinderKey.of("NCI", "A4471"), date(2024, 4, 2), 0, "guess", None)

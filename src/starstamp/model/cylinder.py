@@ -102,8 +102,14 @@ class Cylinder:
     rejection_elastic_expansion: Expansion | None = None
     water_capacity_tenths_l: int | None = None
     tare_hundredths_lb: int | None = None
+    nominal_wall_thousandths_in: int | None = None
+    wall_source: str | None = None
 
     def __post_init__(self) -> None:
+        if self.nominal_wall_thousandths_in is not None and self.nominal_wall_thousandths_in <= 0:
+            raise ValidationError("a wall thickness of zero is not a reading")
+        if self.nominal_wall_thousandths_in is not None and self.wall_source is None:
+            raise ValidationError("a wall thickness has to say where it came from")
         if self.water_capacity_tenths_l is not None and self.water_capacity_tenths_l <= 0:
             raise ValidationError("water capacity must be positive when it is recorded")
         if self.tare_hundredths_lb is not None and self.tare_hundredths_lb <= 0:
@@ -126,6 +132,27 @@ class Cylinder:
         if self.rejection_elastic_expansion is None:
             raise ValidationError(f"{self.key} carries no marked rejection elastic expansion")
         return self.rejection_elastic_expansion
+
+    def require_wall(self) -> int:
+        """The wall thickness the visual limits are fractions of.
+
+        There is no default here on purpose. A shop that assumes a wall will
+        eventually assume one that is thicker than the cylinder in front of it.
+        """
+        if self.nominal_wall_thousandths_in is None:
+            raise ValidationError(
+                f"{self.key} has no recorded wall thickness, so nothing can be judged against it"
+            )
+        return self.nominal_wall_thousandths_in
+
+    @property
+    def wall_is_known(self) -> bool:
+        return self.nominal_wall_thousandths_in is not None
+
+    def with_wall(self, thousandths_in: int, source: str) -> Cylinder:
+        return dataclasses_replace(
+            self, nominal_wall_thousandths_in=thousandths_in, wall_source=source
+        )
 
     def with_status(self, status: CylinderStatus) -> Cylinder:
         if self.status.is_terminal and status is not self.status:

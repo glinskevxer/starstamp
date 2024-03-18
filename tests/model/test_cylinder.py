@@ -116,3 +116,25 @@ def test_service_pressure_comes_from_the_spec() -> None:
 
 def test_text_form_names_all_three() -> None:
     assert str(a_cylinder()) == "NCI/A4471 DOT-3AA2015 nitrogen"
+
+
+def test_a_wall_thickness_has_to_say_where_it_came_from() -> None:
+    with pytest.raises(ValidationError, match="where it came from"):
+        a_cylinder(nominal_wall_thousandths_in=220)
+
+
+def test_a_wall_of_zero_is_not_a_reading() -> None:
+    with pytest.raises(ValidationError, match="not a reading"):
+        a_cylinder(nominal_wall_thousandths_in=0, wall_source="data sheet")
+
+
+def test_an_unknown_wall_refuses_rather_than_defaults() -> None:
+    with pytest.raises(ValidationError, match="no recorded wall thickness"):
+        a_cylinder().require_wall()
+
+
+def test_with_wall_records_the_source() -> None:
+    measured = a_cylinder().with_wall(220, "ultrasonic sweep")
+    assert measured.require_wall() == 220
+    assert measured.wall_source == "ultrasonic sweep"
+    assert measured.wall_is_known
