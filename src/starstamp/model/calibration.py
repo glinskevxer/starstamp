@@ -43,8 +43,9 @@ class InstrumentKind:
     CALIBRATED_CYLINDER = "calibrated_cylinder"
     PRESSURE_INDICATOR = "pressure_indicator"
     EXPANSION_SCALE = "expansion_scale"
+    THICKNESS_GAUGE = "thickness_gauge"
 
-    ALL = (CALIBRATED_CYLINDER, PRESSURE_INDICATOR, EXPANSION_SCALE)
+    ALL = (CALIBRATED_CYLINDER, PRESSURE_INDICATOR, EXPANSION_SCALE, THICKNESS_GAUGE)
 
     @classmethod
     def parse(cls, text: str) -> str:
@@ -55,6 +56,8 @@ class InstrumentKind:
             "transducer": cls.PRESSURE_INDICATOR,
             "scale": cls.EXPANSION_SCALE,
             "burette": cls.EXPANSION_SCALE,
+            "ut": cls.THICKNESS_GAUGE,
+            "ultrasonic": cls.THICKNESS_GAUGE,
         }
         if cleaned in aliases:
             return aliases[cleaned]
