@@ -9,7 +9,7 @@ after the fact.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import Enum
 
@@ -97,13 +97,9 @@ class RequalificationEvent:
         return self.outcome is Outcome.CONDEMN and self.state.stands
 
     def with_id(self, event_id: int) -> RequalificationEvent:
-        from dataclasses import replace
-
         return replace(self, event_id=event_id)
 
     def reversed_by(self, reason: str) -> RequalificationEvent:
-        from dataclasses import replace
-
         if self.state is EventState.REVERSED:
             raise ValidationError("that event has already been reversed")
         return replace(self, state=EventState.REVERSED, notes=(*self.notes, reason))

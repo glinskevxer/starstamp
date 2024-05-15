@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.errors import RuleViolationError, ValidationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import parse_thousandths
@@ -81,7 +82,8 @@ def show(shop: ShopContext, key: str) -> None:
     )
     try:
         pressure = str(required_test_pressure(found.specification))
-    except Exception:  # noqa: BLE001 - a cylinder with no derivable pressure still shows
+    except (RuleViolationError, ValidationError):
+        # A cylinder that is never pressure tested still has a page to show.
         pressure = "-"
     click.echo(
         render_pairs(

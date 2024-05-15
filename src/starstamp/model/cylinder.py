@@ -10,13 +10,13 @@ piece of steel somebody else made in 1974.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from starstamp.errors import ValidationError
 from starstamp.model.dates import StampedMonth
 from starstamp.model.service import GasService
-from starstamp.model.specification import Specification
+from starstamp.model.specification import SpecFamily, Specification
 from starstamp.model.units import Expansion, Pressure
 
 _SERIAL = re.compile(r"^[A-Z0-9][A-Z0-9\-]{0,19}$")
@@ -114,7 +114,7 @@ class Cylinder:
             raise ValidationError("water capacity must be positive when it is recorded")
         if self.tare_hundredths_lb is not None and self.tare_hundredths_lb <= 0:
             raise ValidationError("tare weight must be positive when it is recorded")
-        if self.service.dissolved and not self.specification.family.value.startswith("acetylene"):
+        if self.service.dissolved and self.specification.family is not SpecFamily.ACETYLENE:
             raise ValidationError(
                 f"{self.service} belongs in an acetylene cylinder, not {self.specification}"
             )
@@ -150,20 +150,12 @@ class Cylinder:
         return self.nominal_wall_thousandths_in is not None
 
     def with_wall(self, thousandths_in: int, source: str) -> Cylinder:
-        return dataclasses_replace(
-            self, nominal_wall_thousandths_in=thousandths_in, wall_source=source
-        )
+        return replace(self, nominal_wall_thousandths_in=thousandths_in, wall_source=source)
 
     def with_status(self, status: CylinderStatus) -> Cylinder:
         if self.status.is_terminal and status is not self.status:
             raise ValidationError(f"{self.key} is {self.status.value} and does not come back")
-        return dataclasses_replace(self, status=status)
+        return replace(self, status=status)
 
     def __str__(self) -> str:
         return f"{self.key} {self.specification} {self.service}"
-
-
-def dataclasses_replace(cylinder: Cylinder, **changes: object) -> Cylinder:
-    from dataclasses import replace
-
-    return replace(cylinder, **changes)  # type: ignore[arg-type]
