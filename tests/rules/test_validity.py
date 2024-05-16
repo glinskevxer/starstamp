@@ -4,41 +4,22 @@ from fractions import Fraction
 import pytest
 
 from starstamp.errors import RuleViolationError
-from starstamp.model.calibration import Certificate, InstrumentKind, SystemCheck
+from starstamp.model.calibration import Certificate, InstrumentKind
 from starstamp.model.method import Method
 from starstamp.model.units import Expansion
 from starstamp.rules.validity import assess, needs_daily_check, required_instruments
+
+from ..support.factories import make_certificate, make_check
 
 DAY = date(2024, 6, 12)
 SYSTEM = "WJ-1"
 
 
-def certificate(instrument: str, **changes: object) -> Certificate:
-    base: dict[str, object] = {
-        "system_code": SYSTEM,
-        "instrument": instrument,
-        "serial": f"{instrument[:2].upper()}-1",
-        "issued_on": date(2024, 1, 15),
-        "valid_until": date(2029, 1, 15),
-        "issued_by": "Rocky Mountain Calibration",
-    }
-    base.update(changes)
-    return Certificate(**base)  # type: ignore[arg-type]
-
-
 def full_set() -> list[Certificate]:
-    return [certificate(instrument) for instrument in InstrumentKind.ALL]
-
-
-def good_check(**changes: object) -> SystemCheck:
-    base: dict[str, object] = {
-        "system_code": SYSTEM,
-        "day": DAY,
-        "expected": Expansion.parse("40.0"),
-        "observed": Expansion.parse("40.1"),
-    }
-    base.update(changes)
-    return SystemCheck(**base)  # type: ignore[arg-type]
+    return [
+        make_certificate(instrument, serial=f"{instrument[:2].upper()}-1")
+        for instrument in InstrumentKind.ALL
+    ]
 
 
 def test_which_instruments_each_method_leans_on() -> None:
@@ -62,15 +43,15 @@ def test_only_the_expansion_methods_need_a_daily_check() -> None:
 
 
 def test_a_rig_in_calibration_is_valid() -> None:
-    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), good_check())
+    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), make_check())
     assert validity.is_valid
     assert validity.describe() == "WJ-1 in calibration on 2024-06-12"
     assert validity.require() is validity
 
 
 def test_a_missing_certificate_is_named() -> None:
-    partial = [certificate(InstrumentKind.PRESSURE_INDICATOR)]
-    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, partial, good_check())
+    partial = [make_certificate(InstrumentKind.PRESSURE_INDICATOR)]
+    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, partial, make_check())
     assert not validity.is_valid
     assert "no calibrated_cylinder certificate on file" in validity.faults
     assert "no expansion_scale certificate on file" in validity.faults
@@ -78,24 +59,26 @@ def test_a_missing_certificate_is_named() -> None:
 
 def test_an_expired_certificate_says_when_it_expired() -> None:
     certificates = full_set()
-    certificates[0] = certificate(InstrumentKind.CALIBRATED_CYLINDER, valid_until=date(2024, 6, 11))
-    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, certificates, good_check())
+    certificates[0] = make_certificate(
+        InstrumentKind.CALIBRATED_CYLINDER, valid_until=date(2024, 6, 11)
+    )
+    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, certificates, make_check())
     assert "calibrated_cylinder certificate expired 2024-06-11" in validity.faults
 
 
 def test_a_certificate_issued_after_the_test() -> None:
     certificates = full_set()
-    certificates[1] = certificate(
+    certificates[1] = make_certificate(
         InstrumentKind.PRESSURE_INDICATOR,
         issued_on=date(2024, 7, 1),
         valid_until=date(2029, 7, 1),
     )
-    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, certificates, good_check())
+    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, certificates, make_check())
     assert "pressure_indicator certificate not issued until 2024-07-01" in validity.faults
 
 
 def test_a_proof_pressure_test_ignores_the_expansion_instruments() -> None:
-    only_gauge = [certificate(InstrumentKind.PRESSURE_INDICATOR)]
+    only_gauge = [make_certificate(InstrumentKind.PRESSURE_INDICATOR)]
     assert assess(Method.PROOF_PRESSURE, DAY, SYSTEM, only_gauge, None).is_valid
 
 
@@ -109,25 +92,25 @@ def test_a_missing_daily_check_invalidates_a_volumetric_test() -> None:
 
 
 def test_yesterdays_check_does_not_carry_over() -> None:
-    stale = good_check(day=date(2024, 6, 11))
+    stale = make_check(day=date(2024, 6, 11))
     validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), stale)
     assert "start of day check is dated 2024-06-11" in validity.faults
 
 
 def test_another_rigs_check_does_not_count() -> None:
-    other = good_check(system_code="WJ-2")
+    other = make_check(system_code="WJ-2")
     validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), other)
     assert "start of day check belongs to WJ-2" in validity.faults
 
 
 def test_a_check_out_of_tolerance_invalidates_the_day() -> None:
-    off = good_check(observed=Expansion.parse("39.0"))
+    off = make_check(observed=Expansion.parse("39.0"))
     validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), off)
     assert "start of day check off by -2.50%" in validity.faults
 
 
 def test_the_same_readings_are_valid_under_a_wider_tolerance() -> None:
-    off = good_check(observed=Expansion.parse("39.0"), tolerance_percent=Fraction(3))
+    off = make_check(observed=Expansion.parse("39.0"), tolerance_percent=Fraction(3))
     assert assess(Method.VOLUMETRIC, DAY, SYSTEM, full_set(), off).is_valid
 
 
@@ -147,6 +130,8 @@ def test_requiring_a_bad_rig_raises_with_all_of_it() -> None:
 
 
 def test_certificates_from_another_system_do_not_count() -> None:
-    elsewhere = [certificate(instrument, system_code="WJ-2") for instrument in InstrumentKind.ALL]
-    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, elsewhere, good_check())
+    elsewhere = [
+        make_certificate(instrument, system_code="WJ-2") for instrument in InstrumentKind.ALL
+    ]
+    validity = assess(Method.VOLUMETRIC, DAY, SYSTEM, elsewhere, make_check())
     assert len(validity.faults) == 3

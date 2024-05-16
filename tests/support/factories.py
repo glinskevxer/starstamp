@@ -9,6 +9,7 @@ not exist fails the type check rather than at run time.
 from __future__ import annotations
 
 from datetime import date
+from fractions import Fraction
 
 from starstamp.model.calibration import Certificate, InstrumentKind, SystemCheck
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
@@ -33,6 +34,7 @@ DEFAULT_TOTAL = Expansion(1100)
 DEFAULT_PERMANENT = Expansion(20)
 CHECK_EXPECTED = Expansion(400)
 CHECK_OBSERVED = Expansion(401)
+ONE_PERCENT = Fraction(1)
 
 
 def make_cylinder(
@@ -178,8 +180,15 @@ def make_check(
     day: date = DEFAULT_DAY,
     expected: Expansion = CHECK_EXPECTED,
     observed: Expansion = CHECK_OBSERVED,
+    tolerance_percent: Fraction = ONE_PERCENT,
 ) -> SystemCheck:
-    return SystemCheck(system_code=system_code, day=day, expected=expected, observed=observed)
+    return SystemCheck(
+        system_code=system_code,
+        day=day,
+        expected=expected,
+        observed=observed,
+        tolerance_percent=tolerance_percent,
+    )
 
 
 def make_event(

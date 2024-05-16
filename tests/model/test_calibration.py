@@ -4,26 +4,10 @@ from fractions import Fraction
 import pytest
 
 from starstamp.errors import ValidationError
-from starstamp.model.calibration import (
-    Certificate,
-    InstrumentKind,
-    SystemCheck,
-    normalise_system_code,
-)
+from starstamp.model.calibration import InstrumentKind, SystemCheck, normalise_system_code
 from starstamp.model.units import Expansion
 
-
-def a_certificate(**changes: object) -> Certificate:
-    base: dict[str, object] = {
-        "system_code": "WJ-1",
-        "instrument": InstrumentKind.CALIBRATED_CYLINDER,
-        "serial": "CC-88012",
-        "issued_on": date(2024, 1, 15),
-        "valid_until": date(2029, 1, 15),
-        "issued_by": "Rocky Mountain Calibration",
-    }
-    base.update(changes)
-    return Certificate(**base)  # type: ignore[arg-type]
+from ..support.factories import make_certificate
 
 
 def test_system_codes() -> None:
@@ -51,7 +35,7 @@ def test_unknown_instrument() -> None:
 
 
 def test_certificate_window() -> None:
-    certificate = a_certificate()
+    certificate = make_certificate()
     assert not certificate.valid_on(date(2024, 1, 14))
     assert certificate.valid_on(date(2024, 1, 15))
     assert certificate.valid_on(date(2029, 1, 15))
@@ -59,19 +43,19 @@ def test_certificate_window() -> None:
 
 
 def test_days_left_goes_negative_after_expiry() -> None:
-    certificate = a_certificate()
+    certificate = make_certificate()
     assert certificate.days_left(date(2029, 1, 10)) == 5
     assert certificate.days_left(date(2029, 1, 20)) == -5
 
 
 def test_a_certificate_that_expires_before_issue() -> None:
     with pytest.raises(ValidationError, match="expires before"):
-        a_certificate(valid_until=date(2023, 1, 1))
+        make_certificate(valid_until=date(2023, 1, 1))
 
 
 def test_a_certificate_without_a_serial() -> None:
     with pytest.raises(ValidationError, match="name the instrument"):
-        a_certificate(serial="   ")
+        make_certificate(serial="   ")
 
 
 def test_a_check_dead_on_expected_passes() -> None:
@@ -150,4 +134,4 @@ def test_a_tolerance_of_zero() -> None:
 
 
 def test_certificate_text() -> None:
-    assert str(a_certificate()).startswith("WJ-1 calibrated_cylinder CC-88012")
+    assert str(make_certificate()).startswith("WJ-1 calibrated_cylinder CC-88012")

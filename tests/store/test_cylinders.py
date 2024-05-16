@@ -1,10 +1,10 @@
 from datetime import date
+from typing import Any
 
 import pytest
 
 from starstamp.errors import ConflictError, NotFoundError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
-from starstamp.model.dates import StampedMonth
 from starstamp.model.owner import OwnerAccount
 from starstamp.model.service import ARGON, NITROGEN, OXYGEN
 from starstamp.model.specification import parse_specification
@@ -12,26 +12,23 @@ from starstamp.model.units import Expansion
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.owners import OwnerRepository
 
+from ..support.factories import make_cylinder
+
 RECORDED = date(2024, 3, 1)
 
 
-def a_cylinder(serial: str = "A4471", **changes: object) -> Cylinder:
-    base: dict[str, object] = {
-        "key": CylinderKey.of("NCI", serial),
-        "specification": parse_specification("DOT-3AA2015"),
-        "manufactured": StampedMonth(1998, 6),
-        "service": NITROGEN,
-        "owner_code": "WELD1",
-        "rejection_elastic_expansion": Expansion.parse("31.2"),
-        "water_capacity_tenths_l": 435,
-        "tare_hundredths_lb": 11750,
-    }
-    base.update(changes)
-    return Cylinder(**base)  # type: ignore[arg-type]
+def a_cylinder(serial: str = "A4471", symbol: str = "NCI", **changes: Any) -> Cylinder:
+    """Kept as a shorthand: nearly every test here varies only the serial."""
+    return make_cylinder(key=CylinderKey.of(symbol, serial), **changes)
 
 
 def test_round_trip(cylinders: CylinderRepository, owners: OwnerRepository) -> None:
-    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    full = a_cylinder(
+        rejection_elastic_expansion=Expansion.parse("31.2"),
+        water_capacity_tenths_l=435,
+        tare_hundredths_lb=11750,
+    )
+    cylinders.add(full, owners.id_of("WELD1"), RECORDED)
     found = cylinders.by_key(CylinderKey.of("NCI", "A4471"))
     assert found.specification.code == "3AA"
     assert found.service is NITROGEN
@@ -59,7 +56,7 @@ def test_two_makers_may_share_a_serial(
     cylinders: CylinderRepository, owners: OwnerRepository
 ) -> None:
     cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
-    other = a_cylinder(key=CylinderKey.of("PST", "A4471"))
+    other = a_cylinder(symbol="PST")
     cylinders.add(other, owners.id_of("WELD1"), RECORDED)
     assert cylinders.count() == 2
 
