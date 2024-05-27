@@ -12,6 +12,7 @@ from starstamp import __version__
 from starstamp.cli.accounts import account
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
+from starstamp.cli.requal import requal
 from starstamp.errors import (
     ConflictError,
     NotFoundError,
@@ -116,6 +117,7 @@ def about(shop: ShopContext) -> None:
 
 cli.add_command(account)
 cli.add_command(cylinder)
+cli.add_command(requal)
 
 
 def run() -> int:
