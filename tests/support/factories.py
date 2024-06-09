@@ -204,6 +204,8 @@ def make_event(
     readings: PressureReadings | None = None,
     wall_thousandths_in: int | None = 220,
     state: EventState = EventState.RECORDED,
+    starred: bool = False,
+    plus_rated: bool = False,
     reverses: int | None = None,
 ) -> RequalificationEvent:
     if readings is None and method.is_pressure_test:
@@ -220,5 +222,7 @@ def make_event(
         readings=readings,
         wall_thousandths_in=wall_thousandths_in,
         state=state,
+        starred=starred,
+        plus_rated=plus_rated,
         reverses=reverses,
     )

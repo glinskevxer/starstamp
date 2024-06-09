@@ -65,6 +65,10 @@ def row_to_event(row: sqlite3.Row, key: CylinderKey) -> RequalificationEvent:
         readings=readings,
         wall_thousandths_in=as_optional_int(row["wall_thousandths_in"]),
         state=EventState(as_text(row["state"])),
+        starred=bool(as_int(row["starred"])),
+        plus_rated=bool(as_int(row["plus_rated"])),
+        star_refused=unpack_lines(as_text(row["star_refused"])),
+        plus_refused=unpack_lines(as_text(row["plus_refused"])),
         reverses=as_optional_int(row["reverses_id"]),
         event_id=as_int(row["id"]),
         notes=unpack_lines(as_text(row["notes"])),
@@ -90,8 +94,8 @@ class EventRepository(Repository):
             "INSERT INTO requalification (cylinder_id, performed_on, method, facility_rin,"
             " technician_badge, system_code, outcome, reasons, notes, applied_psig, hold_seconds,"
             " total_tenths_cc, permanent_tenths_cc, leaked, distorted, wall_thousandths_in,"
-            " state, reverses_id, recorded_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " state, reverses_id, starred, plus_rated, star_refused, plus_refused, recorded_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 cylinder_id,
                 day_text(event.performed_on),
@@ -115,6 +119,10 @@ class EventRepository(Repository):
                 event.wall_thousandths_in,
                 event.state.value,
                 event.reverses,
+                int(event.starred),
+                int(event.plus_rated),
+                pack_lines(event.star_refused),
+                pack_lines(event.plus_refused),
                 datetime.now(tz=UTC).isoformat(timespec="seconds"),
             ),
         )

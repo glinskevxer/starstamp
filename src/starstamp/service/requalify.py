@@ -151,6 +151,10 @@ class RequalificationService:
             system_code=request.system_code,
             readings=request.readings if method.is_pressure_test else None,
             wall_thousandths_in=cylinder.nominal_wall_thousandths_in,
+            starred=star.granted and outcome is Outcome.PASS,
+            plus_rated=plus.granted and outcome is Outcome.PASS,
+            star_refused=star.refusals,
+            plus_refused=plus.refusals,
         )
         written = self.events.add(event, self.cylinders.id_of(cylinder.key), list(visual.findings))
         self._move_cylinder(cylinder, outcome)

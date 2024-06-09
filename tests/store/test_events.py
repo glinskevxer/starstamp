@@ -5,7 +5,7 @@ import pytest
 from starstamp.errors import ConflictError, NotFoundError
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind
-from starstamp.model.event import EventState
+from starstamp.model.event import EventState, RequalificationEvent
 from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
 from starstamp.model.units import Expansion, Pressure
@@ -145,3 +145,34 @@ def test_lookups_by_day_and_by_system(book: Book, stocked: CylinderRepository) -
 def test_a_missing_record(book: Book, stocked: CylinderRepository) -> None:
     with pytest.raises(NotFoundError, match="no record of test 99"):
         EventRepository(book.connection).by_id(99)
+
+
+def test_the_marks_survive_the_round_trip(book: Book, stocked: CylinderRepository) -> None:
+    events = EventRepository(book.connection)
+    written = events.add(make_event(starred=True, plus_rated=True), stocked.id_of(KEY))
+    assert written.event_id is not None
+    read_back = events.by_id(written.event_id)
+    assert read_back.starred
+    assert read_back.plus_rated
+    assert read_back.marks == "2024-06 star plus"
+
+
+def test_the_refusals_are_kept_beside_the_event(book: Book, stocked: CylinderRepository) -> None:
+    events = EventRepository(book.connection)
+    event = make_event()
+    written = events.add(
+        RequalificationEvent(
+            cylinder=event.cylinder,
+            performed_on=event.performed_on,
+            method=event.method,
+            facility_rin=event.facility_rin,
+            technician_badge=event.technician_badge,
+            outcome=event.outcome,
+            system_code=event.system_code,
+            readings=event.readings,
+            star_refused=("nitrogen is not a dry service",),
+        ),
+        stocked.id_of(KEY),
+    )
+    assert written.event_id is not None
+    assert events.by_id(written.event_id).star_refused == ("nitrogen is not a dry service",)

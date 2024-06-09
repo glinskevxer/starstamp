@@ -115,3 +115,16 @@ def test_a_suspended_event_is_not_a_pass() -> None:
     suspended = an_event(outcome=Outcome.SUSPENDED, reasons=("valve threads damaged",))
     assert not suspended.may_be_marked
     assert not suspended.is_condemnation
+
+
+def test_marks_read_in_stamping_order() -> None:
+    assert an_event().marks == "2024-06"
+    assert an_event(starred=True).marks == "2024-06 star"
+    assert an_event(starred=True, plus_rated=True).marks == "2024-06 star plus"
+
+
+def test_a_cylinder_that_failed_is_not_stamped() -> None:
+    with pytest.raises(ValidationError, match="not stamped with a star"):
+        an_event(outcome=Outcome.CONDEMN, reasons=("leaked",), starred=True)
+    with pytest.raises(ValidationError, match="not stamped with a plus"):
+        an_event(outcome=Outcome.SUSPENDED, reasons=("threads",), plus_rated=True)

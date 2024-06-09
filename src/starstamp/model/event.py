@@ -65,6 +65,10 @@ class RequalificationEvent:
     readings: PressureReadings | None = None
     wall_thousandths_in: int | None = None
     state: EventState = EventState.RECORDED
+    starred: bool = False
+    plus_rated: bool = False
+    star_refused: tuple[str, ...] = ()
+    plus_refused: tuple[str, ...] = ()
     reverses: int | None = None
     event_id: int | None = None
     notes: tuple[str, ...] = field(default_factory=tuple)
@@ -82,6 +86,10 @@ class RequalificationEvent:
             raise ValidationError("a replacement has to name the event it replaces")
         if self.state is not EventState.REPLACEMENT and self.reverses is not None:
             raise ValidationError("only a replacement names an event it replaces")
+        if self.starred and self.outcome is not Outcome.PASS:
+            raise ValidationError("a cylinder that did not pass is not stamped with a star")
+        if self.plus_rated and self.outcome is not Outcome.PASS:
+            raise ValidationError("a cylinder that did not pass is not stamped with a plus")
 
     @property
     def marked_month(self) -> StampedMonth:
@@ -103,6 +111,16 @@ class RequalificationEvent:
         if self.state is EventState.REVERSED:
             raise ValidationError("that event has already been reversed")
         return replace(self, state=EventState.REVERSED, notes=(*self.notes, reason))
+
+    @property
+    def marks(self) -> str:
+        """The marks that went on the shoulder, in the order they are stamped."""
+        stamped = [self.marked_month.long_form()]
+        if self.starred:
+            stamped.append("star")
+        if self.plus_rated:
+            stamped.append("plus")
+        return " ".join(stamped)
 
     def summary(self) -> str:
         head = (
