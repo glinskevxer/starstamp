@@ -90,6 +90,24 @@ class CalibrationRepository(Repository):
             if certificate.valid_on(day)
         ]
 
+    def by_id(self, certificate_id: int) -> Certificate:
+        return row_to_certificate(
+            self._one(
+                "SELECT * FROM calibration_certificate WHERE id = ?",
+                (certificate_id,),
+                f"no certificate {certificate_id}",
+            )
+        )
+
+    def id_of(self, system_code: str, instrument: str, serial: str) -> int:
+        row = self._one(
+            "SELECT id FROM calibration_certificate WHERE system_code = ? AND instrument = ?"
+            " AND serial = ? AND superseded = 0",
+            (normalise_system_code(system_code), instrument, serial),
+            f"no standing {instrument} certificate for {serial}",
+        )
+        return as_int(row["id"])
+
     def supersede(self, certificate_id: int, note: str) -> None:
         row = self._one(
             "SELECT superseded FROM calibration_certificate WHERE id = ?",
