@@ -14,6 +14,7 @@ from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
 from starstamp.cli.fill import fill
 from starstamp.cli.requal import requal
+from starstamp.cli.restate import restate
 from starstamp.cli.shopfloor import facility, rig, tech
 from starstamp.errors import (
     ConflictError,
@@ -124,6 +125,7 @@ cli.add_command(facility)
 cli.add_command(tech)
 cli.add_command(rig)
 cli.add_command(fill)
+cli.add_command(restate)
 
 
 def run() -> int:
