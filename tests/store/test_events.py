@@ -176,3 +176,13 @@ def test_the_refusals_are_kept_beside_the_event(book: Book, stocked: CylinderRep
     )
     assert written.event_id is not None
     assert events.by_id(written.event_id).star_refused == ("nitrogen is not a dry service",)
+
+
+def test_a_window_reads_across_cylinders(book: Book, stocked: CylinderRepository) -> None:
+    events = EventRepository(book.connection)
+    events.add(make_event(performed_on=date(2024, 6, 11)), stocked.id_of(KEY))
+    events.add(make_event(performed_on=date(2024, 6, 12)), stocked.id_of(KEY))
+    events.add(make_event(performed_on=date(2024, 7, 1)), stocked.id_of(KEY))
+    inside = events.between(date(2024, 6, 1), date(2024, 6, 30))
+    assert [event.performed_on.day for event in inside] == [11, 12]
+    assert events.between(date(2023, 1, 1), date(2023, 12, 31)) == []

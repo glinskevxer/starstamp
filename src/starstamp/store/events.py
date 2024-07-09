@@ -189,6 +189,17 @@ class EventRepository(Repository):
             for row in rows
         ]
 
+    def between(self, first: date, last: date) -> list[RequalificationEvent]:
+        """Every record in a window, whichever rig produced it."""
+        rows = self._all(
+            f"{self._SELECT} WHERE r.performed_on BETWEEN ? AND ? ORDER BY r.performed_on, r.id",
+            (day_text(first), day_text(last)),
+        )
+        return [
+            row_to_event(row, CylinderKey(as_text(row["symbol"]), as_text(row["serial"])))
+            for row in rows
+        ]
+
     def reverse(self, event_id: int, reason: str) -> RequalificationEvent:
         event = self.by_id(event_id)
         if event.state is EventState.REVERSED:
