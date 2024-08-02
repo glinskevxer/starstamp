@@ -35,6 +35,7 @@ from starstamp.rules.marks import Eligibility, plus_eligibility, star_eligibilit
 from starstamp.rules.pressure_test import PressureOutcome, evaluate
 from starstamp.rules.visual import VisualAssessment, VisualResult
 from starstamp.rules.visual import assess as assess_visual
+from starstamp.service.receiving import ReceivingService
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
@@ -158,6 +159,7 @@ class RequalificationService:
         )
         written = self.events.add(event, self.cylinders.id_of(cylinder.key), list(visual.findings))
         self._move_cylinder(cylinder, outcome)
+        ReceivingService(self.book).settle_from_event(written)
 
         due = (
             due_month(cylinder, written.marked_month, method, starred=star.granted)
