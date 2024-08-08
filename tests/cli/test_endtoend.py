@@ -17,7 +17,16 @@ DAY = "2024-06-12"
 
 @pytest.fixture
 def running_shop(shop: Invoke) -> Invoke:
-    shop("account", "add", "weld1", "Cascade Welding Supply", "--contact", "Ruth Alvarez")
+    shop(
+        "account",
+        "add",
+        "weld1",
+        "Cascade Welding Supply",
+        "--contact",
+        "Ruth Alvarez",
+        "--opened",
+        "2019-04-01",
+    )
     shop(
         "facility",
         "add",
