@@ -200,6 +200,21 @@ class EventRepository(Repository):
             for row in rows
         ]
 
+    def for_owner_between(
+        self, owner_code: str, first: date, last: date
+    ) -> list[RequalificationEvent]:
+        """Records in a window against the cylinders one account owns now."""
+        rows = self._all(
+            f"{self._SELECT} JOIN owner_account o ON o.id = c.owner_id"
+            " WHERE o.code = ? AND r.performed_on BETWEEN ? AND ?"
+            " ORDER BY r.performed_on, r.id",
+            (owner_code.upper(), day_text(first), day_text(last)),
+        )
+        return [
+            row_to_event(row, CylinderKey(as_text(row["symbol"]), as_text(row["serial"])))
+            for row in rows
+        ]
+
     def reverse(self, event_id: int, reason: str) -> RequalificationEvent:
         event = self.by_id(event_id)
         if event.state is EventState.REVERSED:

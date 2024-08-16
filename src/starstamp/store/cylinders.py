@@ -200,5 +200,12 @@ class CylinderRepository(Repository):
             for row in rows
         ]
 
+    def by_key_from(self, text: str) -> CylinderKey:
+        """Read a SYMBOL/SERIAL string back into a key this book knows."""
+        key = CylinderKey.parse(text)
+        if not self.exists(key):
+            raise NotFoundError(f"no cylinder {key}")
+        return key
+
     def count(self) -> int:
         return self._count("SELECT count(*) FROM cylinder")
