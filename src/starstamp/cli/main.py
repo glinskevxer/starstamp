@@ -10,6 +10,7 @@ import click
 
 from starstamp import __version__
 from starstamp.cli.accounts import account
+from starstamp.cli.billing import invoice, price
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
 from starstamp.cli.fill import fill
@@ -130,6 +131,8 @@ cli.add_command(fill)
 cli.add_command(restate)
 cli.add_command(report)
 cli.add_command(lot)
+cli.add_command(price)
+cli.add_command(invoice)
 
 
 def run() -> int:

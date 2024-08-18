@@ -1,0 +1,85 @@
+import pytest
+
+from .conftest import Invoke
+from .test_endtoend import DAY, running_shop  # noqa: F401
+
+
+@pytest.fixture
+def priced(running_shop: Invoke) -> Invoke:  # noqa: F811
+    for code, amount, description in (
+        ("REQUAL_WJ", "14.50", "water jacket requalification"),
+        ("CONDEMN", "9.00", "condemnation and disposal"),
+        ("HANDLING", "5.00", "lot handling"),
+    ):
+        running_shop(
+            "price", "set", code, amount, "--from", "2023-01-01", "--description", description
+        )
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+    )
+    return running_shop
+
+
+def test_prices_list(priced: Invoke) -> None:
+    out = priced("--today", "2024-06-12", "price", "list").output
+    assert "REQUAL_WJ" in out
+    assert "14.50" in out
+
+
+def test_raising_a_price_keeps_the_old_one(priced: Invoke) -> None:
+    priced("price", "set", "requal-wj", "16.00", "--from", "2025-01-01")
+    history = priced("price", "list", "--history", "REQUAL_WJ").output
+    assert "2024-12-31" in history
+    assert "16.00" in history
+
+
+def test_no_prices_at_all(running_shop: Invoke) -> None:  # noqa: F811
+    assert "no prices on file" in running_shop("price", "list").output
+
+
+def test_a_draft_shows_the_lines(priced: Invoke) -> None:
+    out = priced("--today", "2024-07-01", "invoice", "draft", "weld1", "--month", "2024-06").output
+    assert "(draft)" in out
+    assert "REQUAL_WJ" in out
+    assert "total    $14.50" in out
+
+
+def test_raising_and_showing(priced: Invoke) -> None:
+    raised = priced(
+        "--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06"
+    ).output
+    assert "raised I2024-0001 WELD1 $14.50" in raised
+    shown = priced("invoice", "show", "i2024-0001").output
+    assert "2024-06-01 to 2024-06-30" in shown
+    assert "NCI/A4471" in shown
+
+
+def test_settling_and_outstanding(priced: Invoke) -> None:
+    priced("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06")
+    out = priced("--today", "2024-09-01", "invoice", "outstanding").output
+    assert "I2024-0001" in out
+    priced("invoice", "settle", "I2024-0001", "--on", "2024-08-05")
+    assert "nothing outstanding" in priced("invoice", "outstanding").output
+
+
+def test_billing_a_window_with_nothing_in_it(priced: Invoke) -> None:
+    priced("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2023-06", expect=4)
+
+
+def test_the_window_defaults_to_this_month(priced: Invoke) -> None:
+    out = priced("--today", "2024-06-30", "invoice", "draft", "weld1").output
+    assert "2024-06-01 to 2024-06-30" in out
