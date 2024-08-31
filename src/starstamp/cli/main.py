@@ -15,6 +15,7 @@ from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
 from starstamp.cli.fill import fill
 from starstamp.cli.lots import lot
+from starstamp.cli.repairs import repair
 from starstamp.cli.report import report
 from starstamp.cli.requal import requal
 from starstamp.cli.restate import restate
@@ -133,6 +134,7 @@ cli.add_command(report)
 cli.add_command(lot)
 cli.add_command(price)
 cli.add_command(invoice)
+cli.add_command(repair)
 
 
 def run() -> int:
