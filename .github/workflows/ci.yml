@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format
+        run: ruff format --check .
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: mypy
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: tests with a coverage floor
+        run: pytest -q --cov --cov-report=term-missing --cov-fail-under=95
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: apply every migration to a scratch book
+        run: python -m starstamp.tools.check_migrations
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - name: a day in the shop, through the installed console script
+        run: |
+          set -e
+          cd "$(mktemp -d)"
+          starstamp --book shop.sqlite3 init
+          starstamp --book shop.sqlite3 account add WELD1 "Cascade Welding Supply" --opened 2019-04-01
+          starstamp --book shop.sqlite3 facility add A419 "Wasatch Cylinder Service" \
+            --from 2021-05-01 --until 2026-04-30 --methods volumetric,visual
+          starstamp --book shop.sqlite3 tech add JT7 "Jesse Tovar" \
+            --methods volumetric,visual --from 2022-03-01
+          for pair in "calibrated cylinder:CC-1" "gauge:PG-1" "burette:EB-1"; do
+            starstamp --book shop.sqlite3 rig certify WJ-1 "${pair%%:*}" \
+              --serial "${pair##*:}" --issued 2024-01-15 --until 2029-01-15 --by "Rocky Mountain"
+          done
+          starstamp --book shop.sqlite3 rig check WJ-1 40.0 40.1 --on 2024-06-12
+          starstamp --book shop.sqlite3 cylinder register NCI/A4471 --owner WELD1 \
+            --spec DOT-3AA2015 --dom 06-98 --service N2 --ree 125.0 --wall 0.220 --on 2024-06-11
+          starstamp --book shop.sqlite3 requal run NCI/A4471 --tech JT7 --system WJ-1 \
+            --on 2024-06-12 --applied 3358 --total 110.0 --permanent 2.0
+          starstamp --book shop.sqlite3 --today 2024-07-01 fill check NCI/A4471
+          starstamp --book shop.sqlite3 report packet NCI/A4471
+          starstamp --book shop.sqlite3 about
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install build==1.2.2.post1
+      - run: python -m build
+      - name: the wheel has to carry the migrations
+        run: |
+          set -e
+          python - <<'PY'
+          import pathlib, zipfile
+          wheel = sorted(pathlib.Path("dist").glob("*.whl"))[-1]
+          names = zipfile.ZipFile(wheel).namelist()
+          sql = [name for name in names if name.endswith(".sql")]
+          assert sql, f"{wheel.name} carries no migrations"
+          assert "starstamp/py.typed" in names, f"{wheel.name} is not marked as typed"
+          print(f"{wheel.name}: {len(sql)} migrations, {len(names)} files")
+          PY
