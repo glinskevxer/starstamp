@@ -24,6 +24,8 @@ jobs:
         run: ruff check .
       - name: ruff format
         run: ruff format --check .
+      - name: the build's own command lines
+        run: python -m starstamp.tools.check_workflow
 
   types:
     runs-on: ubuntu-latest
