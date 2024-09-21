@@ -7,7 +7,8 @@ import click
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth, parse_day
-from starstamp.reporting import audit, throughput
+from starstamp.model.dates import parse_day as _parse_day
+from starstamp.reporting import audit, fleet, rig, throughput
 
 
 @click.group()
@@ -72,3 +73,50 @@ def day_report(shop: ShopContext, day: str | None) -> None:
         click.echo(event.summary())
     click.echo("")
     click.echo(throughput.render_summary(events))
+
+
+@report.command("rig")
+@click.argument("system_code", required=False)
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def rig_report(
+    shop: ShopContext, system_code: str | None, first: str | None, last: str | None
+) -> None:
+    """How the test systems are doing."""
+    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
+    end = _parse_day(last) if last else shop.today
+    with shop.open() as handle:
+        if system_code:
+            standings = [rig.build(handle, system_code.upper(), start, end)]
+        else:
+            standings = rig.build_all(handle, start, end)
+    click.echo(f"{start.isoformat()} to {end.isoformat()}")
+    click.echo(rig.render(standings, shop.today))
+
+
+@report.command("fleet")
+@click.argument("owner")
+@click.option("--within", default=6, show_default=True, help="months ahead to list")
+@click.option("--on", "day", default=None, help="the day to read it for")
+@pass_shop
+def fleet_report(shop: ShopContext, owner: str, within: int, day: str | None) -> None:
+    """One account's cylinders, taken together."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        standing = fleet.build(handle, owner, when)
+    click.echo(fleet.render(standing, months=within))
+
+
+@report.command("floor")
+@click.argument("owner")
+@pass_shop
+def floor(shop: ShopContext, owner: str) -> None:
+    """What of an account's is in the shop right now."""
+    with shop.open() as handle:
+        found = fleet.in_shop(handle, owner)
+    if not found:
+        click.echo(f"nothing of {owner.upper()} is in the shop")
+        return
+    for cylinder in found:
+        click.echo(f"{cylinder.key} {cylinder.specification} {cylinder.status.value}")

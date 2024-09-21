@@ -63,3 +63,48 @@ def test_the_day_report(tested: Invoke) -> None:
     out = tested("report", "day", "--on", DAY).output
     assert "NCI/A4471 volumetric pass" in out
     assert "nothing on 2024-06-13" in tested("report", "day", "--on", "2024-06-13").output
+
+
+def test_the_rig_report(tested: Invoke) -> None:
+    out = tested("report", "rig", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "WJ-1" in out
+    assert "drift" in out
+
+
+def test_the_rig_report_for_one_system(tested: Invoke) -> None:
+    out = tested("report", "rig", "wj-1", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "1 tested" in out
+
+
+def test_the_rig_report_with_nothing_on_file(shop: Invoke) -> None:
+    assert "no test systems on file" in shop("report", "rig").output
+
+
+def test_the_fleet_report(tested: Invoke) -> None:
+    out = tested("report", "fleet", "weld1", "--on", "2034-04-01").output
+    assert "WELD1 holds 1 cylinders" in out
+    assert "due month" in out
+
+
+def test_the_floor_report(tested: Invoke) -> None:
+    assert "nothing of WELD1 is in the shop" in tested("report", "floor", "weld1").output
+    tested(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        "2024-06-13",
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+        "--defect",
+        "threads",
+        expect=5,
+    )
