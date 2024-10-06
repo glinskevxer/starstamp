@@ -13,6 +13,7 @@ from starstamp.cli.accounts import account
 from starstamp.cli.billing import invoice, price
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
+from starstamp.cli.export import export_group
 from starstamp.cli.fill import fill
 from starstamp.cli.lots import lot
 from starstamp.cli.notices import notice
@@ -137,6 +138,7 @@ cli.add_command(price)
 cli.add_command(invoice)
 cli.add_command(repair)
 cli.add_command(notice)
+cli.add_command(export_group)
 
 
 def run() -> int:
