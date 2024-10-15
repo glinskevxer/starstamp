@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from .conftest import Invoke
@@ -5,7 +7,7 @@ from .conftest import Invoke
 
 @pytest.fixture
 def stocked(shop: Invoke) -> Invoke:
-    shop("account", "add", "weld1", "Cascade Welding Supply")
+    shop("account", "add", "weld1", "Cascade Welding Supply", "--opened", "2019-04-01")
     shop(
         "cylinder",
         "register",
@@ -117,3 +119,60 @@ def test_an_acetylene_cylinder_shows_no_test_pressure(shop: Invoke) -> None:
     out = shop("cylinder", "show", "NCI/AC1").output
     assert "test pressure  -" in out
     assert "acetylene visual" in out
+
+
+LIST = """cylinder,specification,manufactured,service,ree,wall
+PST/B12,DOT-3AA2015,06-98,N2,31.2,0.220
+B13,DOT-3AA2015,06-98,N2,,
+PST/B14,DOT-4BA240,09-05,LPG,,0.087
+"""
+
+
+def test_a_dry_run_import(stocked: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "fleet.csv"
+    path.write_text(LIST)
+    out = stocked("cylinder", "import", str(path), "--owner", "weld1").output
+    assert "would take in 2 cylinders" in out
+    assert "1 rows left out" in out
+    assert "nothing was written" in out
+    assert "PST/B12" not in stocked("cylinder", "list").output
+
+
+def test_a_written_import(stocked: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "fleet.csv"
+    path.write_text(LIST)
+    out = stocked("cylinder", "import", str(path), "--owner", "weld1", "--write").output
+    assert "took in 2 cylinders" in out
+    assert "PST/B12" in stocked("cylinder", "list").output
+
+
+def test_an_import_of_a_list_with_no_columns(stocked: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "junk.csv"
+    path.write_text("a,b\n1,2\n")
+    stocked("cylinder", "import", str(path), "--owner", "weld1", expect=4)
+
+
+def test_an_import_for_an_account_that_is_not_there(stocked: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "fleet.csv"
+    path.write_text(LIST)
+    stocked("cylinder", "import", str(path), "--owner", "nope", expect=3)
+
+
+def test_the_template_has_the_columns_the_import_wants(shop: Invoke, tmp_path: Path) -> None:
+    text = shop("cylinder", "template", "--rows", "0").output
+    assert text.strip() == "cylinder,specification,manufactured,service,ree,wall"
+
+
+def test_the_template_example_row_imports_cleanly(stocked: Invoke, tmp_path: Path) -> None:
+    text = stocked("cylinder", "template").output.replace("NCI/A4471", "PST/A9001")
+    path = tmp_path / "template.csv"
+    path.write_text(text)
+    out = stocked("cylinder", "import", str(path), "--owner", "weld1", "--write").output
+    assert "took in 1 cylinders" in out
+
+
+def test_the_import_day_lands_on_the_record(stocked: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "fleet.csv"
+    path.write_text("cylinder,specification,manufactured,service\nPST/B20,DOT-3AA2015,06-98,N2\n")
+    stocked("cylinder", "import", str(path), "--owner", "weld1", "--on", "2024-05-04", "--write")
+    assert "PST/B20" in stocked("cylinder", "list").output

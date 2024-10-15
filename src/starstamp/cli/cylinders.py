@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
@@ -13,6 +15,7 @@ from starstamp.model.service import lookup_service
 from starstamp.model.specification import parse_specification
 from starstamp.model.units import Expansion
 from starstamp.rules.method_matrix import permitted_methods, required_test_pressure
+from starstamp.service.imports import ImportService
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.owners import OwnerRepository
 from starstamp.text.table import dash, render_pairs, render_table
@@ -185,3 +188,38 @@ def set_status(shop: ShopContext, key: str, status_text: str) -> None:
     with shop.open_for_write() as handle:
         moved = CylinderRepository(handle.connection).set_status(wanted, status)
     click.echo(f"{moved.key} is {moved.status.value}")
+
+
+@cylinder.command("import")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--owner", required=True, help="the account the list belongs to")
+@click.option("--on", "day", default=None, help="the day they came on the books")
+@click.option("--write", is_flag=True, help="actually write them; without this it is a dry run")
+@pass_shop
+def import_list(shop: ShopContext, path: Path, owner: str, day: str | None, write: bool) -> None:
+    """Take a customer's cylinder list into the book."""
+    text = path.read_text()
+    when = resolve_day(day, shop)
+    if write:
+        with shop.open_for_write() as handle:
+            result = ImportService(handle).read(text, owner.upper(), when, write=True)
+    else:
+        with shop.open() as handle:
+            result = ImportService(handle).read(text, owner.upper(), when, write=False)
+    click.echo(result.describe())
+    if not write and result.accepted:
+        click.echo("nothing was written; pass --write to take them in")
+
+
+@cylinder.command("template")
+@click.option("--rows", default=1, show_default=True, help="how many example rows to print")
+def template(rows: int) -> None:
+    """Print a blank cylinder list for a customer to fill in.
+
+    The columns after the fourth are optional, and the example row is filled
+    in because a customer sent a list with the specification in the service
+    column three times before this existed.
+    """
+    click.echo("cylinder,specification,manufactured,service,ree,wall")
+    for index in range(max(rows, 0)):
+        click.echo(f"NCI/A{4471 + index},DOT-3AA2015,06-98,N2,31.2,0.220")
