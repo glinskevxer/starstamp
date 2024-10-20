@@ -11,6 +11,7 @@ import click
 from starstamp import __version__
 from starstamp.cli.accounts import account
 from starstamp.cli.billing import invoice, price
+from starstamp.cli.check import check, stats
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
 from starstamp.cli.export import export_group
@@ -139,6 +140,8 @@ cli.add_command(invoice)
 cli.add_command(repair)
 cli.add_command(notice)
 cli.add_command(export_group)
+cli.add_command(check)
+cli.add_command(stats)
 
 
 def run() -> int:
