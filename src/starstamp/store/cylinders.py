@@ -20,10 +20,12 @@ from starstamp.store.repository import (
     Repository,
     as_day,
     as_int,
+    as_optional_day,
     as_optional_int,
     as_optional_text,
     as_text,
     day_text,
+    optional_day_text,
 )
 
 
@@ -41,6 +43,8 @@ def row_to_cylinder(row: sqlite3.Row, owner_code: str) -> Cylinder:
         tare_hundredths_lb=as_optional_int(row["tare_hundredths_lb"]),
         nominal_wall_thousandths_in=as_optional_int(row["nominal_wall_thousandths_in"]),
         wall_source=as_optional_text(row["wall_source"]),
+        valve_outlet=as_optional_text(row["valve_outlet"]),
+        valve_installed_on=as_optional_day(row["valve_installed_on"]),
     )
 
 
@@ -58,8 +62,9 @@ class CylinderRepository(Repository):
                 "INSERT INTO cylinder (serial, manufacturer_symbol, spec_code, spec_family,"
                 " spec_marking, service_pressure_psig, permit_number, service_code, dom_year,"
                 " dom_month, ree_tenths_cc, water_capacity_tenths_l, tare_hundredths_lb,"
-                " nominal_wall_thousandths_in, wall_source, owner_id, status, recorded_on)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " nominal_wall_thousandths_in, wall_source, valve_outlet, valve_installed_on,"
+                " owner_id, status, recorded_on)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     cylinder.key.serial,
                     cylinder.key.manufacturer_symbol,
@@ -78,6 +83,8 @@ class CylinderRepository(Repository):
                     cylinder.tare_hundredths_lb,
                     cylinder.nominal_wall_thousandths_in,
                     cylinder.wall_source,
+                    cylinder.valve_outlet,
+                    optional_day_text(cylinder.valve_installed_on),
                     owner_id,
                     cylinder.status.value,
                     day_text(recorded_on),
@@ -199,6 +206,15 @@ class CylinderRepository(Repository):
             (as_day(row["taken_on"]), as_int(row["thousandths_in"]), as_text(row["source"]))
             for row in rows
         ]
+
+    def fit_valve(self, key: CylinderKey, outlet: str, installed_on: date) -> Cylinder:
+        """Record the valve that is in the cylinder now."""
+        self.connection.execute(
+            "UPDATE cylinder SET valve_outlet = ?, valve_installed_on = ?"
+            " WHERE manufacturer_symbol = ? AND serial = ?",
+            (outlet, day_text(installed_on), key.manufacturer_symbol, key.serial),
+        )
+        return self.by_key(key)
 
     def by_key_from(self, text: str) -> CylinderKey:
         """Read a SYMBOL/SERIAL string back into a key this book knows."""

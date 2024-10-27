@@ -14,6 +14,7 @@ from starstamp.model.defect import parse_thousandths
 from starstamp.model.service import lookup_service
 from starstamp.model.specification import parse_specification
 from starstamp.model.units import Expansion
+from starstamp.model.valve import outlet_for_service, parse_outlet
 from starstamp.rules.method_matrix import permitted_methods, required_test_pressure
 from starstamp.service.imports import ImportService
 from starstamp.store.cylinders import CylinderRepository
@@ -37,6 +38,7 @@ def cylinder() -> None:
 @click.option("--tare", default=None, type=float, help="tare weight in pounds")
 @click.option("--wall", default=None, help="nominal wall in inches, 0.220")
 @click.option("--wall-source", default="manufacturer data sheet", show_default=True)
+@click.option("--valve", default=None, help="the CGA outlet fitted, 580")
 @click.option("--on", "day", default=None, help="the day it was taken on, YYYY-MM-DD")
 @pass_shop
 def register(
@@ -51,6 +53,7 @@ def register(
     tare: float | None,
     wall: str | None,
     wall_source: str,
+    valve: str | None,
     day: str | None,
 ) -> None:
     """Take a cylinder onto the books from its marks."""
@@ -65,6 +68,8 @@ def register(
         tare_hundredths_lb=None if tare is None else round(tare * 100),
         nominal_wall_thousandths_in=None if wall is None else parse_thousandths(wall),
         wall_source=None if wall is None else wall_source,
+        valve_outlet=None if valve is None else parse_outlet(valve).number,
+        valve_installed_on=None if valve is None else resolve_day(day, shop),
     )
     with shop.open_for_write() as handle:
         owner_id = OwnerRepository(handle.connection).id_of(record.owner_code)
@@ -99,6 +104,10 @@ def show(shop: ShopContext, key: str) -> None:
                 ("status", found.status.value),
                 ("ree", dash(found.rejection_elastic_expansion)),
                 ("wall", dash(found.nominal_wall_thousandths_in)),
+                (
+                    "valve",
+                    dash(None if found.valve_outlet is None else f"CGA {found.valve_outlet}"),
+                ),
                 ("test pressure", pressure),
                 ("methods", ", ".join(methods) if methods else "-"),
             ]
@@ -223,3 +232,26 @@ def template(rows: int) -> None:
     click.echo("cylinder,specification,manufactured,service,ree,wall")
     for index in range(max(rows, 0)):
         click.echo(f"NCI/A{4471 + index},DOT-3AA2015,06-98,N2,31.2,0.220")
+
+
+@cylinder.command("valve")
+@click.argument("key")
+@click.argument("outlet", required=False)
+@click.option("--on", "day", default=None, help="the day it was fitted")
+@pass_shop
+def valve(shop: ShopContext, key: str, outlet: str | None, day: str | None) -> None:
+    """Record the valve fitted, or say which one the gas calls for."""
+    wanted = CylinderKey.parse(key)
+    with shop.open() as handle:
+        found = CylinderRepository(handle.connection).by_key(wanted)
+    if outlet is None:
+        needed = outlet_for_service(found.service.code)
+        fitted = "none recorded" if found.valve_outlet is None else f"CGA {found.valve_outlet}"
+        click.echo(f"{wanted} in {found.service}: fitted {fitted}, takes {needed}")
+        return
+    fitting = parse_outlet(outlet)
+    with shop.open_for_write() as handle:
+        updated = CylinderRepository(handle.connection).fit_valve(
+            wanted, fitting.number, resolve_day(day, shop)
+        )
+    click.echo(f"{updated.key} fitted with {fitting} on {updated.valve_installed_on}")

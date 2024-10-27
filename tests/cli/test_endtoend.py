@@ -85,6 +85,8 @@ def running_shop(shop: Invoke) -> Invoke:
         "125.0",
         "--wall",
         "0.220",
+        "--valve",
+        "580",
         "--on",
         "2024-06-11",
     )

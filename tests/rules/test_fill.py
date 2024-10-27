@@ -75,6 +75,7 @@ def test_a_dedicated_cylinder_takes_only_its_own_gas() -> None:
         specification=parse_specification("DOT-4BA240"),
         service=PROPANE,
         rejection_elastic_expansion=None,
+        valve_outlet="555",
     )
     assert decide(dedicated, PROPANE, DAY, LAST_PASS).allowed
     refusals = decide(dedicated, NITROGEN, DAY, LAST_PASS).refusals
@@ -97,7 +98,8 @@ def test_the_plus_rating_lifts_the_ceiling() -> None:
 
 
 def test_a_liquefied_gas_is_filled_by_density_not_pressure() -> None:
-    decision = decide(make_cylinder(), CARBON_DIOXIDE, DAY, LAST_PASS)
+    fitted = make_cylinder(service=CARBON_DIOXIDE, valve_outlet="320")
+    decision = decide(fitted, CARBON_DIOXIDE, DAY, LAST_PASS)
     assert decision.max_pressure is None
     assert decision.filling_density_percent is not None
     assert "50% filling density" in decision.describe()
@@ -115,6 +117,7 @@ def test_the_interval_follows_the_method_of_the_last_pass() -> None:
         specification=parse_specification("DOT-4BA240"),
         service=PROPANE,
         rejection_elastic_expansion=None,
+        valve_outlet="555",
     )
     visual = make_event(
         performed_on=date(2018, 5, 4),
@@ -125,3 +128,21 @@ def test_the_interval_follows_the_method_of_the_last_pass() -> None:
     volumetric = make_event(performed_on=date(2018, 5, 4))
     assert not decide(dedicated, PROPANE, DAY, visual).allowed
     assert decide(dedicated, PROPANE, DAY, volumetric).allowed
+
+
+def test_a_cylinder_with_the_wrong_valve_is_not_filled() -> None:
+    cylinder = make_cylinder(valve_outlet="540", valve_installed_on=date(2019, 4, 1))
+    decision = decide(cylinder, NITROGEN, DAY, LAST_PASS)
+    assert not decision.allowed
+    assert any("valve fitted is CGA 540" in reason for reason in decision.refusals)
+
+
+def test_a_cylinder_with_no_valve_recorded_is_not_filled() -> None:
+    cylinder = make_cylinder(valve_outlet=None, valve_installed_on=None)
+    decision = decide(cylinder, NITROGEN, DAY, LAST_PASS)
+    assert any("no valve outlet is recorded" in reason for reason in decision.refusals)
+
+
+def test_the_valve_refusal_is_not_terminal() -> None:
+    cylinder = make_cylinder(valve_outlet="540", valve_installed_on=date(2019, 4, 1))
+    assert not decide(cylinder, NITROGEN, DAY, LAST_PASS).terminal

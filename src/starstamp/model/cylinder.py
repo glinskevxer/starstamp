@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
+from datetime import date
 from enum import Enum
 
 from starstamp.errors import ValidationError
@@ -104,12 +105,16 @@ class Cylinder:
     tare_hundredths_lb: int | None = None
     nominal_wall_thousandths_in: int | None = None
     wall_source: str | None = None
+    valve_outlet: str | None = None
+    valve_installed_on: date | None = None
 
     def __post_init__(self) -> None:
         if self.nominal_wall_thousandths_in is not None and self.nominal_wall_thousandths_in <= 0:
             raise ValidationError("a wall thickness of zero is not a reading")
         if self.nominal_wall_thousandths_in is not None and self.wall_source is None:
             raise ValidationError("a wall thickness has to say where it came from")
+        if (self.valve_outlet is None) != (self.valve_installed_on is None):
+            raise ValidationError("a valve and the day it went in are recorded together")
         if self.water_capacity_tenths_l is not None and self.water_capacity_tenths_l <= 0:
             raise ValidationError("water capacity must be positive when it is recorded")
         if self.tare_hundredths_lb is not None and self.tare_hundredths_lb <= 0:
@@ -132,6 +137,13 @@ class Cylinder:
         if self.rejection_elastic_expansion is None:
             raise ValidationError(f"{self.key} carries no marked rejection elastic expansion")
         return self.rejection_elastic_expansion
+
+    @property
+    def has_a_valve(self) -> bool:
+        return self.valve_outlet is not None
+
+    def with_valve(self, outlet: str, installed_on: date) -> Cylinder:
+        return replace(self, valve_outlet=outlet, valve_installed_on=installed_on)
 
     def require_wall(self) -> int:
         """The wall thickness the visual limits are fractions of.

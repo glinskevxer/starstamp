@@ -23,6 +23,7 @@ from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.service import GasService
 from starstamp.model.units import Pressure
 from starstamp.rules.interval import due_month, is_out_of_test, life_expired
+from starstamp.rules.valve import refusal as valve_refusal
 
 CITATION = "49 CFR 173.301"
 
@@ -108,6 +109,10 @@ def decide(
         due = due_month(cylinder, last_pass.marked_month, last_pass.method, starred=starred)
         if is_out_of_test(due, day):
             refusals.append(f"out of test since {due.long_form()}")
+
+    valve_problem = valve_refusal(cylinder, gas)
+    if valve_problem is not None:
+        refusals.append(valve_problem)
 
     if gas is not cylinder.service:
         if cylinder.service.requires_dedicated_cylinder:

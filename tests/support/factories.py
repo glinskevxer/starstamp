@@ -35,6 +35,7 @@ DEFAULT_PERMANENT = Expansion(20)
 CHECK_EXPECTED = Expansion(400)
 CHECK_OBSERVED = Expansion(401)
 ONE_PERCENT = Fraction(1)
+VALVE_DAY = date(2019, 4, 1)
 
 
 def make_cylinder(
@@ -50,6 +51,8 @@ def make_cylinder(
     tare_hundredths_lb: int | None = None,
     nominal_wall_thousandths_in: int | None = None,
     wall_source: str | None = None,
+    valve_outlet: str | None = "580",
+    valve_installed_on: date | None = VALVE_DAY,
 ) -> Cylinder:
     return Cylinder(
         key=key,
@@ -63,6 +66,8 @@ def make_cylinder(
         tare_hundredths_lb=tare_hundredths_lb,
         nominal_wall_thousandths_in=nominal_wall_thousandths_in,
         wall_source=wall_source,
+        valve_outlet=valve_outlet,
+        valve_installed_on=valve_installed_on,
     )
 
 

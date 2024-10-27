@@ -176,3 +176,17 @@ def test_the_import_day_lands_on_the_record(stocked: Invoke, tmp_path: Path) -> 
     path.write_text("cylinder,specification,manufactured,service\nPST/B20,DOT-3AA2015,06-98,N2\n")
     stocked("cylinder", "import", str(path), "--owner", "weld1", "--on", "2024-05-04", "--write")
     assert "PST/B20" in stocked("cylinder", "list").output
+
+
+def test_the_valve_is_shown(stocked: Invoke) -> None:
+    stocked("cylinder", "valve", "NCI/A4471", "580", "--on", "2024-06-11")
+    assert "CGA 580" in stocked("cylinder", "show", "NCI/A4471").output
+
+
+def test_asking_which_valve_a_cylinder_takes(stocked: Invoke) -> None:
+    out = stocked("cylinder", "valve", "NCI/A4471").output
+    assert "fitted none recorded, takes CGA 580" in out
+
+
+def test_fitting_a_valve_the_shop_does_not_stock(stocked: Invoke) -> None:
+    stocked("cylinder", "valve", "NCI/A4471", "999", expect=2)
