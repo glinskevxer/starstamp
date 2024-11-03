@@ -106,3 +106,48 @@ def test_a_valve_change_records_the_valve(shop_book: Book) -> None:
         KEY, RepairKind.VALVE_REPLACEMENT, LATER, "JT7", parts="CGA 580 brass"
     )
     assert "CGA 580 brass" in outcome.describe()
+
+
+def test_a_valve_change_records_the_outlet(shop_book: Book) -> None:
+    RepairService(shop_book).perform(
+        KEY, RepairKind.VALVE_REPLACEMENT, LATER, "JT7", parts="CGA 580 brass"
+    )
+    cylinder = CylinderRepository(shop_book.connection).by_key(KEY)
+    assert cylinder.valve_outlet == "580"
+    assert cylinder.valve_installed_on == LATER
+
+
+def test_a_valve_change_that_names_no_outlet(shop_book: Book) -> None:
+    with pytest.raises(RuleViolationError, match="has to name the outlet"):
+        RepairService(shop_book).perform(
+            KEY, RepairKind.VALVE_REPLACEMENT, LATER, "JT7", parts="brass one"
+        )
+
+
+def test_a_valve_that_does_not_suit_the_gas(shop_book: Book) -> None:
+    with pytest.raises(RuleViolationError, match="takes CGA 580"):
+        RepairService(shop_book).perform(
+            KEY, RepairKind.VALVE_REPLACEMENT, LATER, "JT7", parts="CGA 540"
+        )
+
+
+def test_a_service_change_drops_the_valve(shop_book: Book) -> None:
+    from starstamp.model.service import OXYGEN
+
+    cylinders = CylinderRepository(shop_book.connection)
+    cylinders.fit_valve(KEY, "580", date(2019, 4, 1))
+    moved = cylinders.change_service(KEY, OXYGEN)
+    assert moved.service is OXYGEN
+    assert moved.valve_outlet is None
+    RepairService(shop_book).perform(
+        KEY, RepairKind.VALVE_REPLACEMENT, LATER, "JT7", parts="CGA 540"
+    )
+    assert cylinders.by_key(KEY).valve_outlet == "540"
+
+
+def test_a_service_change_to_the_gas_it_is_already_in(shop_book: Book) -> None:
+    from starstamp.errors import ConflictError
+    from starstamp.model.service import NITROGEN
+
+    with pytest.raises(ConflictError, match="already in nitrogen"):
+        CylinderRepository(shop_book.connection).change_service(KEY, NITROGEN)

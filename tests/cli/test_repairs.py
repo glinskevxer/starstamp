@@ -76,9 +76,10 @@ def test_the_history(running_shop: Invoke) -> None:  # noqa: F811
 
 
 def test_a_valve_change_without_the_valve(running_shop: Invoke) -> None:  # noqa: F811
-    running_shop(
-        "repair", "do", "NCI/A4471", "valve", "--tech", "jt7", "--on", "2024-06-14", expect=2
+    result = running_shop(
+        "repair", "do", "NCI/A4471", "valve", "--tech", "jt7", "--on", "2024-06-14", expect=5
     )
+    assert "has to name the outlet fitted" in result.output
 
 
 def test_the_options_for_a_cylinder(running_shop: Invoke) -> None:  # noqa: F811

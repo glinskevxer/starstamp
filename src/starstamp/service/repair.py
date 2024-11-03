@@ -14,10 +14,12 @@ from dataclasses import dataclass
 from datetime import date
 
 from starstamp.errors import RuleViolationError
-from starstamp.model.cylinder import CylinderKey, CylinderStatus
+from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.repair import Repair, RepairKind
+from starstamp.model.valve import Outlet, parse_outlet
 from starstamp.rules.repair import clears_a_suspension, require_permitted
+from starstamp.rules.valve import required_outlet
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
@@ -25,6 +27,18 @@ from starstamp.store.facility import FacilityRepository, TechnicianRepository
 from starstamp.store.repairs import RepairRepository
 
 CITATION = "49 CFR 180.211"
+
+
+def _outlet_in(parts: str) -> Outlet | None:
+    """Find a CGA number anywhere in a parts line."""
+    for token in parts.replace(",", " ").split():
+        cleaned = token.strip().upper().removeprefix("CGA")
+        if cleaned.isdigit():
+            try:
+                return parse_outlet(cleaned)
+            except Exception:  # noqa: BLE001 - an unknown number is simply not an outlet
+                return None
+    return None
 
 
 @dataclass(frozen=True)
@@ -87,6 +101,9 @@ class RepairService:
                     f"{facility.rin} was not in force on {day.isoformat()}", CITATION
                 )
 
+        if kind is RepairKind.VALVE_REPLACEMENT:
+            self._fit_valve(cylinder, parts or "", day)
+
         held = self.held_by(key)
         cleared = held if held is not None and clears_a_suspension(kind) else None
         repair = Repair(
@@ -109,6 +126,28 @@ class RepairService:
         if status is not cylinder.status:
             self.cylinders.set_status(key, status)
         return RepairOutcome(written, cleared, status, needs_test)
+
+    def _fit_valve(self, cylinder: Cylinder, parts: str, day: date) -> None:
+        """Read the outlet off the parts line and put it on the cylinder.
+
+        A valve change is the one repair that changes what the filling plant
+        is allowed to do, so the outlet is not left in a free text field where
+        nothing can read it.
+        """
+        outlet = _outlet_in(parts)
+        if outlet is None:
+            raise RuleViolationError(
+                f"a valve change has to name the outlet fitted, as in CGA 580, not {parts!r}",
+                CITATION,
+            )
+        wanted = required_outlet(cylinder.service)
+        if outlet.number != wanted.number:
+            raise RuleViolationError(
+                f"{cylinder.key} is in {cylinder.service} service and takes {wanted}, "
+                f"not {outlet}; change the service first if that is the intention",
+                CITATION,
+            )
+        self.cylinders.fit_valve(cylinder.key, outlet.number, day)
 
     def _settle_status(
         self, current: CylinderStatus, cleared: bool, needs_test: bool

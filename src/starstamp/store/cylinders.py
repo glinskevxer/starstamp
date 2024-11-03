@@ -216,6 +216,24 @@ class CylinderRepository(Repository):
         )
         return self.by_key(key)
 
+    def change_service(self, key: CylinderKey, service: GasService) -> Cylinder:
+        """Put a cylinder into another gas, dropping the valve on the way.
+
+        The valve that was in it was the interlock for the old gas. Carrying
+        it across would leave a cylinder that reads correct and is not.
+        """
+        cylinder = self.by_key(key)
+        if cylinder.status.is_terminal:
+            raise ConflictError(f"{key} is {cylinder.status.value} and changes no service")
+        if cylinder.service is service:
+            raise ConflictError(f"{key} is already in {service} service")
+        self.connection.execute(
+            "UPDATE cylinder SET service_code = ?, valve_outlet = NULL,"
+            " valve_installed_on = NULL WHERE manufacturer_symbol = ? AND serial = ?",
+            (service.code, key.manufacturer_symbol, key.serial),
+        )
+        return self.by_key(key)
+
     def by_key_from(self, text: str) -> CylinderKey:
         """Read a SYMBOL/SERIAL string back into a key this book knows."""
         key = CylinderKey.parse(text)

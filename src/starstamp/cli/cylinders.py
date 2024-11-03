@@ -255,3 +255,17 @@ def valve(shop: ShopContext, key: str, outlet: str | None, day: str | None) -> N
             wanted, fitting.number, resolve_day(day, shop)
         )
     click.echo(f"{updated.key} fitted with {fitting} on {updated.valve_installed_on}")
+
+
+@cylinder.command("service")
+@click.argument("key")
+@click.argument("gas")
+@pass_shop
+def change_service(shop: ShopContext, key: str, gas: str) -> None:
+    """Put a cylinder into another gas. The valve comes off with the old one."""
+    wanted = CylinderKey.parse(key)
+    service = lookup_service(gas)
+    with shop.open_for_write() as handle:
+        moved = CylinderRepository(handle.connection).change_service(wanted, service)
+    needed = outlet_for_service(moved.service.code)
+    click.echo(f"{moved.key} is now in {moved.service} service and needs {needed}")

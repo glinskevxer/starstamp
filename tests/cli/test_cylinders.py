@@ -190,3 +190,27 @@ def test_asking_which_valve_a_cylinder_takes(stocked: Invoke) -> None:
 
 def test_fitting_a_valve_the_shop_does_not_stock(stocked: Invoke) -> None:
     stocked("cylinder", "valve", "NCI/A4471", "999", expect=2)
+
+
+def test_changing_the_service_drops_the_valve(stocked: Invoke) -> None:
+    stocked("cylinder", "valve", "NCI/A4471", "580", "--on", "2024-06-11")
+    out = stocked("cylinder", "service", "NCI/A4471", "O2").output
+    assert "now in oxygen service and needs CGA 540" in out
+    assert "fitted none recorded" in stocked("cylinder", "valve", "NCI/A4471").output
+
+
+def test_a_valve_change_needs_a_technician_on_the_bench(stocked: Invoke) -> None:
+    result = stocked(
+        "repair",
+        "do",
+        "NCI/A4471",
+        "valve",
+        "--tech",
+        "jt7",
+        "--on",
+        "2024-06-14",
+        "--parts",
+        "CGA 580 brass",
+        expect=3,
+    )
+    assert "no technician JT7" in result.output
