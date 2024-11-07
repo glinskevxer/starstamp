@@ -52,3 +52,25 @@ def test_readings_build() -> None:
     assert readings is not None
     assert readings.distorted
     assert readings.permanent_percentage > 0
+
+
+def test_a_scan_parses_off_the_command_line() -> None:
+    from starstamp.cli.requal import parse_scan
+
+    scan = parse_scan("M1:0.215, M2:0.214,L1:0.210")
+    assert scan.count == 3
+    assert scan.thinnest.thousandths_in == 210
+
+
+def test_a_scan_point_without_a_thickness() -> None:
+    from starstamp.cli.requal import parse_scan
+
+    with pytest.raises(ValidationError, match="POSITION:INCHES"):
+        parse_scan("M1")
+
+
+def test_an_empty_scan() -> None:
+    from starstamp.cli.requal import parse_scan
+
+    with pytest.raises(ValidationError, match="not a scan"):
+        parse_scan(" , ")

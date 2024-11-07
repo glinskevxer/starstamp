@@ -16,6 +16,7 @@ from starstamp.model.defect import DefectKind, Observation
 from starstamp.model.event import EventState, Outcome, RequalificationEvent
 from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
+from starstamp.model.ultrasonic import Band, Position, Reading, Scan
 from starstamp.model.units import Expansion, Pressure
 from starstamp.rules.visual import Finding, VisualResult
 from starstamp.store.repository import (
@@ -143,6 +144,36 @@ class EventRepository(Repository):
                 ),
             )
         return event.with_id(event_id)
+
+    def add_scan(self, event_id: int, scan: Scan) -> None:
+        """File the ultrasonic readings that go with a record of test."""
+        for reading in scan.readings:
+            self.connection.execute(
+                "INSERT INTO ultrasonic_reading (requalification_id, band, position_index,"
+                " thousandths_in) VALUES (?, ?, ?, ?)",
+                (
+                    event_id,
+                    reading.position.band.value,
+                    reading.position.index,
+                    reading.thousandths_in,
+                ),
+            )
+
+    def scan_for(self, event_id: int) -> Scan:
+        rows = self._all(
+            "SELECT * FROM ultrasonic_reading WHERE requalification_id = ?"
+            " ORDER BY band, position_index",
+            (event_id,),
+        )
+        return Scan(
+            tuple(
+                Reading(
+                    Position(Band(as_text(row["band"])), as_int(row["position_index"])),
+                    as_int(row["thousandths_in"]),
+                )
+                for row in rows
+            )
+        )
 
     def by_id(self, event_id: int) -> RequalificationEvent:
         row = self._one(

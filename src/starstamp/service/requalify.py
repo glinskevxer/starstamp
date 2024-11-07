@@ -28,11 +28,14 @@ from starstamp.model.defect import Observation
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
+from starstamp.model.ultrasonic import Scan
 from starstamp.rules import validity as validity_rules
 from starstamp.rules.authorisation import authorise, choose_method
 from starstamp.rules.interval import due_month, life_expired
 from starstamp.rules.marks import Eligibility, plus_eligibility, star_eligibility
 from starstamp.rules.pressure_test import PressureOutcome, evaluate
+from starstamp.rules.ultrasonic import ScanOutcome
+from starstamp.rules.ultrasonic import evaluate as evaluate_scan
 from starstamp.rules.visual import VisualAssessment, VisualResult
 from starstamp.rules.visual import assess as assess_visual
 from starstamp.service.receiving import ReceivingService
@@ -56,6 +59,7 @@ class RequalificationRequest:
     system_code: str | None = None
     observations: tuple[Observation, ...] = ()
     readings: PressureReadings | None = None
+    scan: Scan | None = None
     facility_rin: str | None = None
 
 
@@ -67,6 +71,7 @@ class RequalificationResult:
     visual: VisualAssessment
     validity: validity_rules.Validity
     pressure: PressureOutcome | None
+    scan: ScanOutcome | None
     star: Eligibility
     plus: Eligibility
     due: StampedMonth | None
@@ -128,7 +133,8 @@ class RequalificationService:
             cylinder.nominal_wall_thousandths_in or 0,
         )
         pressure = self._run_rig(cylinder, method, request, visual)
-        outcome, reasons = self._decide(visual, pressure)
+        scan = self._run_scan(cylinder, method, request, visual)
+        outcome, reasons = self._decide(visual, pressure, scan)
 
         star = star_eligibility(
             cylinder,
@@ -158,6 +164,8 @@ class RequalificationService:
             plus_refused=plus.refusals,
         )
         written = self.events.add(event, self.cylinders.id_of(cylinder.key), list(visual.findings))
+        if request.scan is not None and written.event_id is not None:
+            self.events.add_scan(written.event_id, request.scan)
         self._move_cylinder(cylinder, outcome)
         ReceivingService(self.book).settle_from_event(written)
 
@@ -166,7 +174,7 @@ class RequalificationService:
             if outcome is Outcome.PASS
             else None
         )
-        return RequalificationResult(written, visual, validity, pressure, star, plus, due)
+        return RequalificationResult(written, visual, validity, pressure, scan, star, plus, due)
 
     def _run_rig(
         self,
@@ -187,8 +195,32 @@ class RequalificationService:
             )
         return evaluate(cylinder, method, request.readings)
 
+    def _run_scan(
+        self,
+        cylinder: Cylinder,
+        method: Method,
+        request: RequalificationRequest,
+        visual: VisualAssessment,
+    ) -> ScanOutcome | None:
+        """An ultrasonic exam, on a cylinder that got past its visual."""
+        if method is not Method.ULTRASONIC:
+            if request.scan is not None:
+                raise RuleViolationError(f"{method.label} takes no ultrasonic readings", CITATION)
+            return None
+        if visual.result is not VisualResult.PASS:
+            return None
+        if request.scan is None:
+            raise RuleViolationError(
+                "an ultrasonic examination needs its readings before an event can be written",
+                CITATION,
+            )
+        return evaluate_scan(cylinder, request.scan)
+
     def _decide(
-        self, visual: VisualAssessment, pressure: PressureOutcome | None
+        self,
+        visual: VisualAssessment,
+        pressure: PressureOutcome | None,
+        scan: ScanOutcome | None = None,
     ) -> tuple[Outcome, tuple[str, ...]]:
         if visual.result is VisualResult.CONDEMN:
             return Outcome.CONDEMN, tuple(
@@ -202,6 +234,8 @@ class RequalificationService:
             )
         if pressure is not None and not pressure.passed:
             return Outcome.CONDEMN, pressure.reasons
+        if scan is not None and not scan.passed:
+            return Outcome.CONDEMN, scan.reasons
         return Outcome.PASS, ()
 
     def _previous_due(self, cylinder: Cylinder) -> StampedMonth | None:

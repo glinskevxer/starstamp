@@ -10,6 +10,7 @@ from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind, Observation, parse_thousandths
 from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
+from starstamp.model.ultrasonic import Position, Reading, Scan
 from starstamp.model.units import Expansion, Pressure
 from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.events import EventRepository
@@ -30,6 +31,26 @@ def parse_defect(text: str) -> Observation:
     return Observation(
         kind=kind, depth_thousandths_in=depth, length_thousandths_in=length, note=note
     )
+
+
+def parse_scan(text: str) -> Scan:
+    """Read a scan sheet off the command line: M1:0.215,M2:0.214.
+
+    The thickness is in inches because that is what the meter reads out, and
+    the position is the same label the paper scan sheet uses.
+    """
+    readings: list[Reading] = []
+    for item in text.split(","):
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        position, _, thickness = cleaned.partition(":")
+        if not thickness:
+            raise ValidationError(f"a scan point is POSITION:INCHES, got {cleaned!r}")
+        readings.append(Reading(Position.parse(position), parse_thousandths(thickness)))
+    if not readings:
+        raise ValidationError("a scan with no points in it is not a scan")
+    return Scan(tuple(readings))
 
 
 def build_readings(
@@ -77,6 +98,12 @@ def requal() -> None:
     multiple=True,
     help="kind:depth:length:note, repeat for each condition found",
 )
+@click.option(
+    "--scan",
+    "scan_text",
+    default=None,
+    help="ultrasonic readings, M1:0.215,M2:0.214 and so on",
+)
 @click.option("--rin", default=None, help="name the RIN when the book holds more than one")
 @pass_shop
 def run_requalification(
@@ -93,6 +120,7 @@ def run_requalification(
     leaked: bool,
     distorted: bool,
     defects: tuple[str, ...],
+    scan_text: str | None,
     rin: str | None,
 ) -> None:
     """Requalify a cylinder and write the record of test."""
@@ -104,6 +132,7 @@ def run_requalification(
         system_code=system_code,
         observations=tuple(parse_defect(item) for item in defects),
         readings=build_readings(applied, hold, total, permanent, leaked, distorted),
+        scan=None if scan_text is None else parse_scan(scan_text),
         facility_rin=rin,
     )
     with shop.open_for_write() as handle:
@@ -111,6 +140,9 @@ def run_requalification(
     click.echo(result.summary())
     for reason in result.event.reasons:
         click.echo(f"  {reason}")
+    if result.scan is not None:
+        for note in result.scan.watch:
+            click.echo(f"  watch: {note}")
     if not result.star.granted and result.event.outcome.may_be_marked:
         click.echo(f"  no star: {result.star.refusals[0]}")
 

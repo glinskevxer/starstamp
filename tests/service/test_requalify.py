@@ -9,6 +9,7 @@ from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import DefectKind
 from starstamp.model.event import Outcome
 from starstamp.model.method import Method
+from starstamp.model.ultrasonic import Position, Reading, Scan
 from starstamp.model.units import Expansion
 from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.cylinders import CylinderRepository
@@ -18,6 +19,20 @@ from ..support.factories import make_check, make_observation, make_readings
 from ..support.shop import DAY, SYSTEM, a_wet_cylinder
 
 KEY = CylinderKey("NCI", "A4471")
+
+
+def _a_scan(value: int, thin: tuple[str, int] | None = None) -> Scan:
+    points = [
+        ("S1", value),
+        ("U1", value),
+        ("U2", value),
+        ("M1", value),
+        ("M2", value),
+        ("L1", value),
+    ]
+    if thin is not None:
+        points = [thin if name == thin[0] else (name, reading) for name, reading in points]
+    return Scan(tuple(Reading(Position.parse(name), reading) for name, reading in points))
 
 
 def a_request(**changes: object) -> RequalificationRequest:
@@ -143,3 +158,102 @@ def test_a_welded_cylinder_in_a_dedicated_service_takes_the_visual(shop_book: Bo
     assert result.outcome is Outcome.PASS
     assert result.due == StampedMonth(2029, 6)
     assert not result.star.granted
+
+
+def test_an_ultrasonic_examination_passes(shop_book: Book) -> None:
+    from starstamp.model.specification import parse_specification
+
+    from ..support.factories import make_cylinder
+    from ..support.shop import stock
+
+    key = stock(
+        shop_book,
+        make_cylinder(
+            key=CylinderKey("LUX", "AL9"),
+            specification=parse_specification("DOT-3AL3000"),
+            nominal_wall_thousandths_in=220,
+            wall_source="data sheet",
+        ),
+    )
+    scan = _a_scan(215)
+    result = RequalificationService(shop_book).perform(
+        a_request(key=key, method=Method.ULTRASONIC, readings=None, scan=scan)
+    )
+    assert result.outcome is Outcome.PASS
+    assert result.scan is not None
+    assert result.scan.passed
+    assert not result.star.granted
+
+
+def test_a_thin_spot_condemns_through_the_service(shop_book: Book) -> None:
+    from starstamp.model.specification import parse_specification
+
+    from ..support.factories import make_cylinder
+    from ..support.shop import stock
+
+    key = stock(
+        shop_book,
+        make_cylinder(
+            key=CylinderKey("LUX", "AL9"),
+            specification=parse_specification("DOT-3AL3000"),
+            nominal_wall_thousandths_in=220,
+            wall_source="data sheet",
+        ),
+    )
+    scan = _a_scan(215, thin=("U2", 190))
+    result = RequalificationService(shop_book).perform(
+        a_request(key=key, method=Method.ULTRASONIC, readings=None, scan=scan)
+    )
+    assert result.outcome is Outcome.CONDEMN
+    assert "design minimum" in result.event.reasons[0]
+
+
+def test_a_scan_handed_to_a_water_jacket_test(shop_book: Book) -> None:
+    with pytest.raises(RuleViolationError, match="takes no ultrasonic readings"):
+        RequalificationService(shop_book).perform(a_request(scan=_a_scan(215)))
+
+
+def test_an_ultrasonic_method_with_no_scan(shop_book: Book) -> None:
+    from starstamp.model.specification import parse_specification
+
+    from ..support.factories import make_cylinder
+    from ..support.shop import stock
+
+    key = stock(
+        shop_book,
+        make_cylinder(
+            key=CylinderKey("LUX", "AL9"),
+            specification=parse_specification("DOT-3AL3000"),
+            nominal_wall_thousandths_in=220,
+            wall_source="data sheet",
+        ),
+    )
+    with pytest.raises(RuleViolationError, match="needs its readings"):
+        RequalificationService(shop_book).perform(
+            a_request(key=key, method=Method.ULTRASONIC, readings=None)
+        )
+
+
+def test_the_scan_is_kept_beside_the_record(shop_book: Book) -> None:
+    from starstamp.model.specification import parse_specification
+
+    from ..support.factories import make_cylinder
+    from ..support.shop import stock
+
+    key = stock(
+        shop_book,
+        make_cylinder(
+            key=CylinderKey("LUX", "AL9"),
+            specification=parse_specification("DOT-3AL3000"),
+            nominal_wall_thousandths_in=220,
+            wall_source="data sheet",
+        ),
+    )
+    service = RequalificationService(shop_book)
+    result = service.perform(
+        a_request(key=key, method=Method.ULTRASONIC, readings=None, scan=_a_scan(215))
+    )
+    assert result.event.event_id is not None
+    stored = service.events.scan_for(result.event.event_id)
+    assert stored.count == 6
+    assert stored.thinnest.thousandths_in == 215
