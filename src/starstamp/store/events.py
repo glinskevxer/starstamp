@@ -11,6 +11,7 @@ import sqlite3
 from datetime import UTC, date, datetime
 
 from starstamp.errors import ConflictError, NotFoundError
+from starstamp.model.acetylene import AcetyleneExam
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind, Observation
 from starstamp.model.event import EventState, Outcome, RequalificationEvent
@@ -173,6 +174,39 @@ class EventRepository(Repository):
                 )
                 for row in rows
             )
+        )
+
+    def add_acetylene_exam(self, event_id: int, exam: AcetyleneExam, marked: int) -> None:
+        """File the weighing that goes with an acetylene record of test."""
+        self.connection.execute(
+            "INSERT INTO acetylene_exam (requalification_id, tare_now_hundredths_lb,"
+            " marked_hundredths_lb, fuse_plugs_sound, mass_settled, shell_sound, cap_sound,"
+            " note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                event_id,
+                exam.tare_now_hundredths_lb,
+                marked,
+                int(exam.fuse_plugs_sound),
+                int(exam.mass_settled),
+                int(exam.shell_sound),
+                int(exam.cap_sound),
+                exam.note,
+            ),
+        )
+
+    def acetylene_exam(self, event_id: int) -> AcetyleneExam | None:
+        row = self.connection.execute(
+            "SELECT * FROM acetylene_exam WHERE requalification_id = ?", (event_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return AcetyleneExam(
+            tare_now_hundredths_lb=as_int(row["tare_now_hundredths_lb"]),
+            fuse_plugs_sound=bool(as_int(row["fuse_plugs_sound"])),
+            mass_settled=bool(as_int(row["mass_settled"])),
+            shell_sound=bool(as_int(row["shell_sound"])),
+            cap_sound=bool(as_int(row["cap_sound"])),
+            note=as_optional_text(row["note"]),
         )
 
     def by_id(self, event_id: int) -> RequalificationEvent:

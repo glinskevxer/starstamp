@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from starstamp.errors import RuleViolationError
+from starstamp.model.acetylene import AcetyleneExam
 from starstamp.model.calibration import InstrumentKind
 from starstamp.model.cylinder import CylinderKey, CylinderStatus
 from starstamp.model.dates import StampedMonth
@@ -257,3 +258,103 @@ def test_the_scan_is_kept_beside_the_record(shop_book: Book) -> None:
     stored = service.events.scan_for(result.event.event_id)
     assert stored.count == 6
     assert stored.thinnest.thousandths_in == 215
+
+
+def an_acetylene_cylinder(book: Book) -> CylinderKey:
+    from starstamp.model.service import ACETYLENE
+    from starstamp.model.specification import parse_specification
+
+    from ..support.factories import make_cylinder
+    from ..support.shop import stock
+
+    return stock(
+        book,
+        make_cylinder(
+            key=CylinderKey("PST", "AC7"),
+            specification=parse_specification("DOT-8AL"),
+            service=ACETYLENE,
+            rejection_elastic_expansion=None,
+            tare_hundredths_lb=8500,
+            valve_outlet="510",
+        ),
+    )
+
+
+def test_an_acetylene_cylinder_that_holds_its_weight_passes(shop_book: Book) -> None:
+    key = an_acetylene_cylinder(shop_book)
+    result = RequalificationService(shop_book).perform(
+        a_request(
+            key=key,
+            method=Method.ACETYLENE_VISUAL,
+            readings=None,
+            system_code=None,
+            acetylene=AcetyleneExam(tare_now_hundredths_lb=8470),
+        )
+    )
+    assert result.outcome is Outcome.PASS
+    assert result.acetylene is not None
+    assert result.due == StampedMonth(2034, 6)
+
+
+def test_a_light_acetylene_cylinder_is_condemned(shop_book: Book) -> None:
+    key = an_acetylene_cylinder(shop_book)
+    result = RequalificationService(shop_book).perform(
+        a_request(
+            key=key,
+            method=Method.ACETYLENE_VISUAL,
+            readings=None,
+            system_code=None,
+            acetylene=AcetyleneExam(tare_now_hundredths_lb=8000),
+        )
+    )
+    assert result.outcome is Outcome.CONDEMN
+    assert "against its marked tare" in result.event.reasons[0]
+
+
+def test_bad_plugs_suspend_the_acetylene_cylinder(shop_book: Book) -> None:
+    key = an_acetylene_cylinder(shop_book)
+    result = RequalificationService(shop_book).perform(
+        a_request(
+            key=key,
+            method=Method.ACETYLENE_VISUAL,
+            readings=None,
+            system_code=None,
+            acetylene=AcetyleneExam(tare_now_hundredths_lb=8470, fuse_plugs_sound=False),
+        )
+    )
+    assert result.outcome is Outcome.SUSPENDED
+    assert "fusible plugs" in result.event.reasons[0]
+
+
+def test_the_weighing_is_kept(shop_book: Book) -> None:
+    key = an_acetylene_cylinder(shop_book)
+    service = RequalificationService(shop_book)
+    result = service.perform(
+        a_request(
+            key=key,
+            method=Method.ACETYLENE_VISUAL,
+            readings=None,
+            system_code=None,
+            acetylene=AcetyleneExam(tare_now_hundredths_lb=8470, note="scale 2"),
+        )
+    )
+    assert result.event.event_id is not None
+    stored = service.events.acetylene_exam(result.event.event_id)
+    assert stored is not None
+    assert stored.tare_now_hundredths_lb == 8470
+    assert stored.note == "scale 2"
+
+
+def test_a_weighing_handed_to_a_water_jacket_test(shop_book: Book) -> None:
+    with pytest.raises(RuleViolationError, match="does not weigh the cylinder"):
+        RequalificationService(shop_book).perform(
+            a_request(acetylene=AcetyleneExam(tare_now_hundredths_lb=8470))
+        )
+
+
+def test_an_acetylene_examination_with_no_weighing(shop_book: Book) -> None:
+    key = an_acetylene_cylinder(shop_book)
+    with pytest.raises(RuleViolationError, match="needs the cylinder weighed"):
+        RequalificationService(shop_book).perform(
+            a_request(key=key, method=Method.ACETYLENE_VISUAL, readings=None, system_code=None)
+        )

@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from starstamp.errors import RuleViolationError
+from starstamp.model.acetylene import AcetyleneExam
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import Observation
@@ -30,6 +31,8 @@ from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
 from starstamp.model.ultrasonic import Scan
 from starstamp.rules import validity as validity_rules
+from starstamp.rules.acetylene import AcetyleneOutcome
+from starstamp.rules.acetylene import evaluate as evaluate_acetylene
 from starstamp.rules.authorisation import authorise, choose_method
 from starstamp.rules.interval import due_month, life_expired
 from starstamp.rules.marks import Eligibility, plus_eligibility, star_eligibility
@@ -60,6 +63,7 @@ class RequalificationRequest:
     observations: tuple[Observation, ...] = ()
     readings: PressureReadings | None = None
     scan: Scan | None = None
+    acetylene: AcetyleneExam | None = None
     facility_rin: str | None = None
 
 
@@ -72,6 +76,7 @@ class RequalificationResult:
     validity: validity_rules.Validity
     pressure: PressureOutcome | None
     scan: ScanOutcome | None
+    acetylene: AcetyleneOutcome | None
     star: Eligibility
     plus: Eligibility
     due: StampedMonth | None
@@ -134,7 +139,8 @@ class RequalificationService:
         )
         pressure = self._run_rig(cylinder, method, request, visual)
         scan = self._run_scan(cylinder, method, request, visual)
-        outcome, reasons = self._decide(visual, pressure, scan)
+        acetylene = self._weigh(cylinder, method, request, visual)
+        outcome, reasons = self._decide(visual, pressure, scan, acetylene)
 
         star = star_eligibility(
             cylinder,
@@ -166,6 +172,10 @@ class RequalificationService:
         written = self.events.add(event, self.cylinders.id_of(cylinder.key), list(visual.findings))
         if request.scan is not None and written.event_id is not None:
             self.events.add_scan(written.event_id, request.scan)
+        if request.acetylene is not None and written.event_id is not None:
+            self.events.add_acetylene_exam(
+                written.event_id, request.acetylene, cylinder.tare_hundredths_lb or 0
+            )
         self._move_cylinder(cylinder, outcome)
         ReceivingService(self.book).settle_from_event(written)
 
@@ -174,7 +184,9 @@ class RequalificationService:
             if outcome is Outcome.PASS
             else None
         )
-        return RequalificationResult(written, visual, validity, pressure, scan, star, plus, due)
+        return RequalificationResult(
+            written, visual, validity, pressure, scan, acetylene, star, plus, due
+        )
 
     def _run_rig(
         self,
@@ -216,11 +228,34 @@ class RequalificationService:
             )
         return evaluate_scan(cylinder, request.scan)
 
+    def _weigh(
+        self,
+        cylinder: Cylinder,
+        method: Method,
+        request: RequalificationRequest,
+        visual: VisualAssessment,
+    ) -> AcetyleneOutcome | None:
+        """The weighing that stands in for a rig on an acetylene cylinder."""
+        if method is not Method.ACETYLENE_VISUAL:
+            if request.acetylene is not None:
+                raise RuleViolationError(f"{method.label} does not weigh the cylinder", CITATION)
+            return None
+        if visual.result is not VisualResult.PASS:
+            return None
+        if request.acetylene is None:
+            raise RuleViolationError(
+                "an acetylene examination needs the cylinder weighed before an event "
+                "can be written",
+                CITATION,
+            )
+        return evaluate_acetylene(cylinder, request.acetylene)
+
     def _decide(
         self,
         visual: VisualAssessment,
         pressure: PressureOutcome | None,
         scan: ScanOutcome | None = None,
+        acetylene: AcetyleneOutcome | None = None,
     ) -> tuple[Outcome, tuple[str, ...]]:
         if visual.result is VisualResult.CONDEMN:
             return Outcome.CONDEMN, tuple(
@@ -236,6 +271,10 @@ class RequalificationService:
             return Outcome.CONDEMN, pressure.reasons
         if scan is not None and not scan.passed:
             return Outcome.CONDEMN, scan.reasons
+        if acetylene is not None and not acetylene.passed:
+            if acetylene.result is VisualResult.REPAIR:
+                return Outcome.SUSPENDED, acetylene.reasons
+            return Outcome.CONDEMN, acetylene.reasons
         return Outcome.PASS, ()
 
     def _previous_due(self, cylinder: Cylinder) -> StampedMonth | None:
