@@ -37,7 +37,7 @@ def running_shop(shop: Invoke) -> Invoke:
         "--until",
         "2026-04-30",
         "--methods",
-        "volumetric,direct-expansion,proof,visual",
+        "volumetric,direct-expansion,proof,visual,acetylene",
     )
     shop(
         "tech",
@@ -45,7 +45,7 @@ def running_shop(shop: Invoke) -> Invoke:
         "jt7",
         "Jesse Tovar",
         "--methods",
-        "volumetric,visual",
+        "volumetric,visual,acetylene",
         "--from",
         "2022-03-01",
     )
@@ -283,3 +283,65 @@ def test_history_of_a_cylinder_with_nothing_on_it(running_shop: Invoke) -> None:
         "AR",
     )
     assert "no records of test" in running_shop("requal", "history", "PST/B12").output
+
+
+def test_an_acetylene_cylinder_goes_through_on_the_scale(running_shop: Invoke) -> None:
+    running_shop(
+        "cylinder",
+        "register",
+        "PST/AC7",
+        "--owner",
+        "WELD1",
+        "--spec",
+        "DOT-8AL",
+        "--dom",
+        "04-05",
+        "--service",
+        "C2H2",
+        "--tare",
+        "85.0",
+        "--valve",
+        "510",
+        "--on",
+        "2024-06-11",
+    )
+    out = running_shop(
+        "requal",
+        "run",
+        "PST/AC7",
+        "--tech",
+        "jt7",
+        "--on",
+        DAY,
+        "--tare",
+        "84.70",
+    ).output
+    assert "acetylene visual pass" in out
+    assert "due 06-34" in out
+
+
+def test_a_light_acetylene_cylinder_is_condemned_at_the_counter(running_shop: Invoke) -> None:
+    running_shop(
+        "cylinder",
+        "register",
+        "PST/AC8",
+        "--owner",
+        "WELD1",
+        "--spec",
+        "DOT-8AL",
+        "--dom",
+        "04-05",
+        "--service",
+        "C2H2",
+        "--tare",
+        "85.0",
+        "--valve",
+        "510",
+        "--on",
+        "2024-06-11",
+    )
+    out = running_shop(
+        "requal", "run", "PST/AC8", "--tech", "jt7", "--on", DAY, "--tare", "80.0"
+    ).output
+    assert "condemn" in out
+    assert "marked tare" in out

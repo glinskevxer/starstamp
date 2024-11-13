@@ -6,6 +6,7 @@ import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.errors import ValidationError
+from starstamp.model.acetylene import AcetyleneExam
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind, Observation, parse_thousandths
 from starstamp.model.method import Method
@@ -51,6 +52,41 @@ def parse_scan(text: str) -> Scan:
     if not readings:
         raise ValidationError("a scan with no points in it is not a scan")
     return Scan(tuple(readings))
+
+
+def build_acetylene(
+    tare: str | None,
+    plugs_bad: bool,
+    mass_settled: bool,
+    shell_bad: bool,
+    cap_bad: bool,
+) -> AcetyleneExam | None:
+    """Build the weighing, or nothing at all if the cylinder was not weighed.
+
+    The findings only mean something beside a weight, so a run that flags bad
+    plugs without putting the cylinder on the scale is a refusal rather than a
+    half filled record.
+    """
+    if tare is None:
+        if plugs_bad or mass_settled or shell_bad or cap_bad:
+            raise ValidationError("an acetylene finding needs the cylinder weighed; pass --tare")
+        return None
+    return AcetyleneExam(
+        tare_now_hundredths_lb=parse_pounds(tare),
+        fuse_plugs_sound=not plugs_bad,
+        mass_settled=mass_settled,
+        shell_sound=not shell_bad,
+        cap_sound=not cap_bad,
+    )
+
+
+def parse_pounds(text: str) -> int:
+    """Read a weight in pounds into hundredths."""
+    cleaned = text.strip().lower().removesuffix("lb").strip()
+    whole, _, part = cleaned.partition(".")
+    if not whole.isdigit() or (part and not part.isdigit()) or len(part) > 2:
+        raise ValidationError(f"a weight is pounds to two places, got {text!r}")
+    return int(whole) * 100 + int(part.ljust(2, "0") or "0")
 
 
 def build_readings(
@@ -104,6 +140,11 @@ def requal() -> None:
     default=None,
     help="ultrasonic readings, M1:0.215,M2:0.214 and so on",
 )
+@click.option("--tare", default=None, help="the weight on the scale now, in pounds")
+@click.option("--plugs-bad", is_flag=True, help="the fusible plugs are unsound")
+@click.option("--mass-settled", is_flag=True, help="the porous mass has settled")
+@click.option("--shell-bad", is_flag=True, help="the shell is unsound")
+@click.option("--cap-bad", is_flag=True, help="the cap is unsound")
 @click.option("--rin", default=None, help="name the RIN when the book holds more than one")
 @pass_shop
 def run_requalification(
@@ -121,6 +162,11 @@ def run_requalification(
     distorted: bool,
     defects: tuple[str, ...],
     scan_text: str | None,
+    tare: str | None,
+    plugs_bad: bool,
+    mass_settled: bool,
+    shell_bad: bool,
+    cap_bad: bool,
     rin: str | None,
 ) -> None:
     """Requalify a cylinder and write the record of test."""
@@ -133,6 +179,7 @@ def run_requalification(
         observations=tuple(parse_defect(item) for item in defects),
         readings=build_readings(applied, hold, total, permanent, leaked, distorted),
         scan=None if scan_text is None else parse_scan(scan_text),
+        acetylene=build_acetylene(tare, plugs_bad, mass_settled, shell_bad, cap_bad),
         facility_rin=rin,
     )
     with shop.open_for_write() as handle:

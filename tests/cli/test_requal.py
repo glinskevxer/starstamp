@@ -74,3 +74,37 @@ def test_an_empty_scan() -> None:
 
     with pytest.raises(ValidationError, match="not a scan"):
         parse_scan(" , ")
+
+
+def test_pounds_parse() -> None:
+    from starstamp.cli.requal import parse_pounds
+
+    assert parse_pounds("84.70") == 8470
+    assert parse_pounds(" 84 lb ") == 8400
+    assert parse_pounds("84.7") == 8470
+
+
+@pytest.mark.parametrize("text", ["", "84.705", "eighty", "-84"])
+def test_bad_pounds(text: str) -> None:
+    from starstamp.cli.requal import parse_pounds
+
+    with pytest.raises(ValidationError, match="pounds to two places"):
+        parse_pounds(text)
+
+
+def test_an_acetylene_finding_needs_a_weight() -> None:
+    from starstamp.cli.requal import build_acetylene
+
+    assert build_acetylene(None, False, False, False, False) is None
+    with pytest.raises(ValidationError, match="needs the cylinder weighed"):
+        build_acetylene(None, True, False, False, False)
+
+
+def test_the_weighing_builds() -> None:
+    from starstamp.cli.requal import build_acetylene
+
+    exam = build_acetylene("84.70", True, False, False, True)
+    assert exam is not None
+    assert exam.tare_now_hundredths_lb == 8470
+    assert not exam.fuse_plugs_sound
+    assert not exam.cap_sound
