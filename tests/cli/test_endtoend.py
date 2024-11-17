@@ -345,3 +345,107 @@ def test_a_light_acetylene_cylinder_is_condemned_at_the_counter(running_shop: In
     ).output
     assert "condemn" in out
     assert "marked tare" in out
+
+
+def test_the_record_shows_an_ultrasonic_scan(running_shop: Invoke) -> None:
+    running_shop(
+        "cylinder",
+        "register",
+        "LUX/AL9",
+        "--owner",
+        "WELD1",
+        "--spec",
+        "DOT-3AL3000",
+        "--dom",
+        "03-14",
+        "--service",
+        "SCBA",
+        "--wall",
+        "0.220",
+        "--valve",
+        "346",
+        "--on",
+        "2024-06-11",
+    )
+    running_shop(
+        "rig",
+        "certify",
+        "WJ-1",
+        "ultrasonic",
+        "--serial",
+        "UT-2",
+        "--issued",
+        "2024-01-15",
+        "--until",
+        "2029-01-15",
+        "--by",
+        "Rocky Mountain Calibration",
+    )
+    running_shop(
+        "tech",
+        "add",
+        "mr2",
+        "Marisol Reyes",
+        "--methods",
+        "ultrasonic",
+        "--from",
+        "2023-01-09",
+    )
+    running_shop(
+        "facility",
+        "add",
+        "b420",
+        "Wasatch Cylinder Service",
+        "--from",
+        "2021-05-01",
+        "--until",
+        "2026-04-30",
+        "--methods",
+        "ultrasonic",
+    )
+    out = running_shop(
+        "requal",
+        "run",
+        "LUX/AL9",
+        "--tech",
+        "mr2",
+        "--rin",
+        "b420",
+        "--method",
+        "ut",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--scan",
+        "S1:0.215,U1:0.215,U2:0.214,M1:0.216,M2:0.215,L1:0.213",
+    ).output
+    assert "ultrasonic pass" in out
+    detail = running_shop("requal", "show", "1").output
+    assert "scan: 6 points across 4 bands" in detail
+    assert "0.213" in detail
+
+
+def test_the_record_shows_an_acetylene_weighing(running_shop: Invoke) -> None:
+    running_shop(
+        "cylinder",
+        "register",
+        "PST/AC9",
+        "--owner",
+        "WELD1",
+        "--spec",
+        "DOT-8AL",
+        "--dom",
+        "04-05",
+        "--service",
+        "C2H2",
+        "--tare",
+        "85.0",
+        "--valve",
+        "510",
+        "--on",
+        "2024-06-11",
+    )
+    running_shop("requal", "run", "PST/AC9", "--tech", "jt7", "--on", DAY, "--tare", "84.70")
+    detail = running_shop("requal", "show", "1").output
+    assert "weighing: tare 84.70 lb" in detail

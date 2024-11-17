@@ -233,6 +233,8 @@ def show_event(shop: ShopContext, event_id: int) -> None:
         repository = EventRepository(handle.connection)
         event = repository.by_id(event_id)
         findings = repository.observations(event_id)
+        scan = repository.scan_for(event_id)
+        weighing = repository.acetylene_exam(event_id)
     readings = event.readings
     click.echo(
         render_pairs(
@@ -252,5 +254,20 @@ def show_event(shop: ShopContext, event_id: int) -> None:
     )
     for observation, result, reason in findings:
         click.echo(f"  {result.value}: {observation.describe()} ({reason})")
+    if scan.count:
+        click.echo(f"  scan: {scan.describe()}")
+        click.echo(
+            "  "
+            + render_table(
+                ["point", "inches"],
+                [
+                    [str(reading.position), f"{reading.thousandths_in / 1000:.3f}"]
+                    for reading in sorted(scan.readings, key=lambda item: item.position)
+                ],
+                right=(1,),
+            ).replace("\n", "\n  ")
+        )
+    if weighing is not None:
+        click.echo(f"  weighing: {weighing.describe()}")
     for reason in event.reasons:
         click.echo(f"  {reason}")

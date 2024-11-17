@@ -67,3 +67,13 @@ def test_describing_a_scan() -> None:
     scan = a_scan(("M1", 214), ("L1", 208))
     assert scan.describe() == "2 points across 2 bands, thinnest L1 0.208 in"
     assert Scan(()).describe() == "no readings"
+
+
+def test_bands_sort_from_the_shoulder_down() -> None:
+    assert Band.SHOULDER < Band.MIDDLE < Band.BASE
+    assert Band.SHOULDER.height == 0
+
+
+def test_positions_sort_down_the_cylinder_then_around_it() -> None:
+    positions = [Position.parse(name) for name in ("M2", "S1", "L1", "M1", "B3")]
+    assert [str(item) for item in sorted(positions)] == ["S1", "M1", "M2", "L1", "B3"]

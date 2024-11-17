@@ -39,8 +39,20 @@ class Band(Enum):
             "B": "base",
         }[self.value]
 
+    @property
+    def height(self) -> int:
+        """Where the band sits, counting down from the shoulder.
 
-@dataclass(frozen=True, order=True)
+        The bands have a real order and a scan sheet reads top to bottom, so
+        sorting positions has to sort by this rather than alphabetically.
+        """
+        return {"S": 0, "U": 1, "M": 2, "L": 3, "B": 4}[self.value]
+
+    def __lt__(self, other: Band) -> bool:
+        return self.height < other.height
+
+
+@dataclass(frozen=True)
 class Position:
     """One spot on the cylinder, as the scan sheet names it."""
 
@@ -62,6 +74,13 @@ class Position:
             bands = ", ".join(item.value for item in Band)
             raise ValidationError(f"the bands are {bands}, not {match.group('band')}") from exc
         return cls(band, int(match.group("index")))
+
+    @property
+    def sort_key(self) -> tuple[int, int]:
+        return (self.band.height, self.index)
+
+    def __lt__(self, other: Position) -> bool:
+        return self.sort_key < other.sort_key
 
     def __str__(self) -> str:
         return f"{self.band.value}{self.index}"
