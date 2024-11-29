@@ -108,3 +108,72 @@ def test_the_floor_report(tested: Invoke) -> None:
         "threads",
         expect=5,
     )
+
+
+def test_the_condemnation_report(running_shop: Invoke) -> None:  # noqa: F811
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+        "--defect",
+        "bulge",
+    )
+    out = running_shop(
+        "report", "condemnations", "--from", "2024-01-01", "--to", "2024-12-31"
+    ).output
+    assert "1 condemned between" in out
+    assert "bulge" in out
+    assert "1990s" in out
+
+
+def test_a_quiet_condemnation_report(tested: Invoke) -> None:
+    out = tested("report", "condemnations", "--from", "2023-01-01", "--to", "2023-12-31").output
+    assert "nothing condemned" in out
+
+
+def test_the_bench_sheet(running_shop: Invoke) -> None:  # noqa: F811
+    assert "nothing on the bench" in running_shop("report", "bench").output
+    running_shop(
+        "lot", "receive", "weld1", "NCI/A4471", "--on", "2024-06-03", "--promised", "2024-06-28"
+    )
+    out = running_shop("--today", "2024-06-12", "report", "bench").output
+    assert "L2024-0001" in out
+    assert "NCI/A4471" in out
+    assert "in_shop" in out
+
+
+def test_the_bench_sheet_shows_what_a_cylinder_is_held_for(running_shop: Invoke) -> None:  # noqa: F811
+    running_shop("lot", "receive", "weld1", "NCI/A4471", "--on", "2024-06-03")
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+        "--defect",
+        "threads",
+    )
+    out = running_shop("report", "bench").output
+    assert "nothing on the bench" in out

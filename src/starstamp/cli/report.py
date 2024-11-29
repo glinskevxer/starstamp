@@ -8,7 +8,10 @@ from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.dates import parse_day as _parse_day
-from starstamp.reporting import audit, fleet, rig, throughput
+from starstamp.reporting import audit, condemnation, fleet, rig, throughput
+from starstamp.service.receiving import ReceivingService
+from starstamp.service.repair import RepairService
+from starstamp.text.table import render_table
 
 
 @click.group()
@@ -120,3 +123,55 @@ def floor(shop: ShopContext, owner: str) -> None:
         return
     for cylinder in found:
         click.echo(f"{cylinder.key} {cylinder.specification} {cylinder.status.value}")
+
+
+@report.command("condemnations")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def condemnation_report(shop: ShopContext, first: str | None, last: str | None) -> None:
+    """What was condemned, and what those cylinders had in common."""
+    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
+    end = _parse_day(last) if last else shop.today
+    with shop.open() as handle:
+        analysis = condemnation.build(handle, start, end)
+    click.echo(condemnation.render(analysis))
+
+
+@report.command("bench")
+@click.option("--on", "day", default=None, help="the day to make the sheet for")
+@pass_shop
+def bench_sheet(shop: ShopContext, day: str | None) -> None:
+    """The work sheet: what is in the shop and what each one needs.
+
+    The counter prints this in the morning. It is deliberately one line per
+    cylinder with the reason it is here, because a sheet that needs a second
+    lookup gets left on the desk.
+    """
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        service = ReceivingService(handle)
+        repairs = RepairService(handle)
+        lines: list[list[str]] = []
+        for standing in service.open_standing():
+            for line in standing.lines:
+                if line.is_settled:
+                    continue
+                key = CylinderKey.parse(line.cylinder_key)
+                cylinder = service.cylinders.by_key(key)
+                held = repairs.held_by(key)
+                lines.append(
+                    [
+                        standing.lot.number,
+                        str(key),
+                        str(cylinder.specification),
+                        cylinder.service.code,
+                        cylinder.status.value,
+                        "-" if held is None else "; ".join(held.reasons),
+                    ]
+                )
+    if not lines:
+        click.echo(f"nothing on the bench for {when.isoformat()}")
+        return
+    click.echo(f"bench sheet {when.isoformat()}")
+    click.echo(render_table(["lot", "cylinder", "spec", "gas", "status", "held for"], lines))
