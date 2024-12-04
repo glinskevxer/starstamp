@@ -38,6 +38,19 @@ class CylinderStatus(Enum):
     def is_terminal(self) -> bool:
         return self in {CylinderStatus.CONDEMNED, CylinderStatus.SCRAPPED, CylinderStatus.LOST}
 
+    def may_move_to(self, other: CylinderStatus) -> bool:
+        """Whether a cylinder in this status may be put in that one.
+
+        A condemned cylinder still has one move left in it: it gets scrapped.
+        Everything else about a terminal status is terminal, and in particular
+        nothing comes back into service.
+        """
+        if self is other:
+            return True
+        if not self.is_terminal:
+            return True
+        return self is CylinderStatus.CONDEMNED and other is CylinderStatus.SCRAPPED
+
     @property
     def accepts_work(self) -> bool:
         return self in {
@@ -165,7 +178,7 @@ class Cylinder:
         return replace(self, nominal_wall_thousandths_in=thousandths_in, wall_source=source)
 
     def with_status(self, status: CylinderStatus) -> Cylinder:
-        if self.status.is_terminal and status is not self.status:
+        if not self.status.may_move_to(status):
             raise ValidationError(f"{self.key} is {self.status.value} and does not come back")
         return replace(self, status=status)
 

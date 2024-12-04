@@ -1,0 +1,109 @@
+from datetime import date
+
+import pytest
+
+from starstamp.errors import RuleViolationError
+from starstamp.model.cylinder import CylinderKey, CylinderStatus
+from starstamp.model.defect import DefectKind
+from starstamp.model.disposal import DisposalMethod
+from starstamp.model.method import Method
+from starstamp.service.disposal import DisposalService
+from starstamp.service.requalify import RequalificationRequest, RequalificationService
+from starstamp.store.cylinders import CylinderRepository
+from starstamp.store.db import Book
+
+from ..support.factories import make_observation, make_readings
+from ..support.shop import DAY, SYSTEM
+
+KEY = CylinderKey("NCI", "A4471")
+
+
+def condemn(book: Book) -> None:
+    RequalificationService(book).perform(
+        RequalificationRequest(
+            key=KEY,
+            day=DAY,
+            technician_badge="JT7",
+            method=Method.VOLUMETRIC,
+            system_code=SYSTEM,
+            readings=make_readings(),
+            observations=(make_observation(DefectKind.BULGE),),
+        )
+    )
+
+
+def test_a_condemned_cylinder_is_drilled_and_scrapped(shop_book: Book) -> None:
+    condemn(shop_book)
+    disposal = DisposalService(shop_book).dispose(
+        KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "JT7", scrap_ticket="SC-4411"
+    )
+    assert disposal.scrap_ticket == "SC-4411"
+    assert CylinderRepository(shop_book.connection).by_key(KEY).status is CylinderStatus.SCRAPPED
+
+
+def test_holding_one_for_its_owner_leaves_it_condemned(shop_book: Book) -> None:
+    condemn(shop_book)
+    DisposalService(shop_book).dispose(KEY, DisposalMethod.HELD_FOR_OWNER, date(2024, 6, 20), "JT7")
+    assert CylinderRepository(shop_book.connection).by_key(KEY).status is CylinderStatus.CONDEMNED
+
+
+def test_a_cylinder_that_was_never_condemned(shop_book: Book) -> None:
+    with pytest.raises(RuleViolationError, match="only a condemned cylinder"):
+        DisposalService(shop_book).dispose(KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "JT7")
+
+
+def test_a_cylinder_condemned_by_hand_with_no_record(shop_book: Book) -> None:
+    CylinderRepository(shop_book.connection).set_status(KEY, CylinderStatus.CONDEMNED)
+    with pytest.raises(RuleViolationError, match="no standing condemnation"):
+        DisposalService(shop_book).dispose(KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "JT7")
+
+
+def test_the_clock_runs_from_the_record_of_test(shop_book: Book) -> None:
+    condemn(shop_book)
+    disposal = DisposalService(shop_book).dispose(
+        KEY, DisposalMethod.CRUSHED, date(2024, 7, 20), "JT7"
+    )
+    assert disposal.condemned_on == DAY
+    assert disposal.is_late
+    assert disposal.days_taken == 38
+
+
+def test_what_is_still_outstanding(shop_book: Book) -> None:
+    condemn(shop_book)
+    service = DisposalService(shop_book)
+    waiting = service.outstanding(date(2024, 6, 20))
+    assert len(waiting) == 1
+    assert waiting[0].days_waiting == 8
+    assert waiting[0].due_by == date(2024, 7, 12)
+    assert not waiting[0].is_late
+    assert "due by 2024-07-12" in waiting[0].describe()
+
+
+def test_late_ones_are_flagged(shop_book: Book) -> None:
+    condemn(shop_book)
+    service = DisposalService(shop_book)
+    assert service.late(date(2024, 7, 12)) == []
+    late = service.late(date(2024, 7, 13))
+    assert len(late) == 1
+    assert "LATE" in late[0].describe()
+
+
+def test_a_dealt_with_cylinder_drops_off_the_list(shop_book: Book) -> None:
+    condemn(shop_book)
+    service = DisposalService(shop_book)
+    service.dispose(KEY, DisposalMethod.HELD_FOR_OWNER, date(2024, 6, 20), "JT7")
+    assert service.outstanding(date(2024, 6, 21)) == []
+
+
+def test_a_cylinder_going_home_is_rendered_first(shop_book: Book) -> None:
+    condemn(shop_book)
+    disposal = DisposalService(shop_book).dispose(
+        KEY,
+        DisposalMethod.NECK_CUT,
+        date(2024, 6, 20),
+        "JT7",
+        witness_badge="MR2",
+        returned_to_owner=True,
+    )
+    assert disposal.returned_to_owner
+    assert "returned to the owner" in disposal.summary()

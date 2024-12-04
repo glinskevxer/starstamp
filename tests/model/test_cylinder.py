@@ -125,3 +125,15 @@ def test_with_wall_records_the_source() -> None:
     assert measured.require_wall() == 220
     assert measured.wall_source == "ultrasonic sweep"
     assert measured.wall_is_known
+
+
+def test_a_condemned_cylinder_still_gets_scrapped() -> None:
+    condemned = make_cylinder(status=CylinderStatus.CONDEMNED)
+    assert CylinderStatus.CONDEMNED.may_move_to(CylinderStatus.SCRAPPED)
+    assert condemned.with_status(CylinderStatus.SCRAPPED).status is CylinderStatus.SCRAPPED
+
+
+def test_a_scrapped_cylinder_has_no_moves_left() -> None:
+    assert not CylinderStatus.SCRAPPED.may_move_to(CylinderStatus.CONDEMNED)
+    assert not CylinderStatus.LOST.may_move_to(CylinderStatus.IN_SERVICE)
+    assert CylinderStatus.SCRAPPED.may_move_to(CylinderStatus.SCRAPPED)
