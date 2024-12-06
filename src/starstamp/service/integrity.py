@@ -98,6 +98,7 @@ class IntegrityService:
             findings.extend(self._notices(cylinder.owner_code, history))
         findings.extend(self._settled_against_reversals())
         findings.extend(self._late_letters(today))
+        findings.extend(self._undealt_with(today))
         return Report(tuple(findings), len(fleet))
 
     def _schema(self) -> list[Finding]:
@@ -212,6 +213,21 @@ class IntegrityService:
             )
             for notice in self.notices.unsent()
             if notice.is_late(today)
+        ]
+
+    def _undealt_with(self, today: date) -> list[Finding]:
+        """Condemned cylinders still sitting on the floor past the deadline."""
+        from starstamp.service.disposal import DisposalService
+
+        return [
+            Finding(
+                "disposal",
+                Severity.PROBLEM,
+                str(row.cylinder.key),
+                f"condemned {row.condemned_on.isoformat()} and not rendered; it was due by "
+                f"{row.due_by.isoformat()}",
+            )
+            for row in DisposalService(self.book).late(today)
         ]
 
     def _settled_against_reversals(self) -> list[Finding]:

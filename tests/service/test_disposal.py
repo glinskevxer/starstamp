@@ -107,3 +107,20 @@ def test_a_cylinder_going_home_is_rendered_first(shop_book: Book) -> None:
     )
     assert disposal.returned_to_owner
     assert "returned to the owner" in disposal.summary()
+
+
+def test_the_badges_are_normalised_and_checked(shop_book: Book) -> None:
+    condemn(shop_book)
+    disposal = DisposalService(shop_book).dispose(
+        KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "jt7", witness_badge="mr2"
+    )
+    assert disposal.technician_badge == "JT7"
+    assert disposal.witness_badge == "MR2"
+
+
+def test_a_technician_who_is_not_on_the_bench(shop_book: Book) -> None:
+    from starstamp.errors import NotFoundError
+
+    condemn(shop_book)
+    with pytest.raises(NotFoundError, match="no technician ZZ9"):
+        DisposalService(shop_book).dispose(KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "zz9")

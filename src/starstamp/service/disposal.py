@@ -16,10 +16,12 @@ from starstamp.errors import RuleViolationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.disposal import RENDER_WITHIN_DAYS, Disposal, DisposalMethod
 from starstamp.model.event import Outcome, RequalificationEvent
+from starstamp.model.facility import normalise_badge
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.disposals import DisposalRepository
 from starstamp.store.events import EventRepository
+from starstamp.store.facility import TechnicianRepository
 
 CITATION = "49 CFR 180.205(i)"
 
@@ -51,6 +53,7 @@ class DisposalService:
         self.cylinders = CylinderRepository(book.connection)
         self.disposals = DisposalRepository(book.connection)
         self.events = EventRepository(book.connection)
+        self.technicians = TechnicianRepository(book.connection)
 
     def condemning_event(self, key: CylinderKey) -> RequalificationEvent:
         """The standing record of test that condemned a cylinder."""
@@ -80,13 +83,15 @@ class DisposalService:
                 CITATION,
             )
         event = self.condemning_event(key)
+        technician = self.technicians.by_badge(technician_badge)
+        witness = None if witness_badge is None else normalise_badge(witness_badge)
         disposal = Disposal(
             cylinder_key=str(key),
             method=method,
             performed_on=day,
-            technician_badge=technician_badge,
+            technician_badge=technician.badge,
             condemned_on=event.performed_on,
-            witness_badge=witness_badge,
+            witness_badge=witness,
             scrap_ticket=scrap_ticket,
             returned_to_owner=returned_to_owner,
             note=note,
