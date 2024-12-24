@@ -177,3 +177,14 @@ def test_the_bench_sheet_shows_what_a_cylinder_is_held_for(running_shop: Invoke)
     )
     out = running_shop("report", "bench").output
     assert "nothing on the bench" in out
+
+
+def test_the_technician_report(tested: Invoke) -> None:
+    out = tested("report", "technicians", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "JT7" in out
+    assert "volumetric" in out
+
+
+def test_the_technician_report_of_a_quiet_window(tested: Invoke) -> None:
+    out = tested("report", "technicians", "--from", "2023-01-01", "--to", "2023-12-31").output
+    assert "nobody did any work" in out

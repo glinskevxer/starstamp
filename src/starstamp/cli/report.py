@@ -8,7 +8,7 @@ from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.dates import parse_day as _parse_day
-from starstamp.reporting import audit, condemnation, fleet, rig, throughput
+from starstamp.reporting import audit, condemnation, fleet, rig, technician, throughput
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
 from starstamp.text.table import render_table
@@ -175,3 +175,27 @@ def bench_sheet(shop: ShopContext, day: str | None) -> None:
         return
     click.echo(f"bench sheet {when.isoformat()}")
     click.echo(render_table(["lot", "cylinder", "spec", "gas", "status", "held for"], lines))
+
+
+@report.command("technicians")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def technician_report(shop: ShopContext, first: str | None, last: str | None) -> None:
+    """What each person got through, and who sits away from the middle."""
+    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
+    end = _parse_day(last) if last else shop.today
+    with shop.open() as handle:
+        comparison = technician.build(handle, start, end)
+    click.echo(f"{start.isoformat()} to {end.isoformat()}")
+    click.echo(technician.render(comparison))
+    mix = technician.method_mix(comparison)
+    if mix:
+        click.echo("")
+        click.echo(
+            render_table(
+                ["method", "cylinders"],
+                [[label, str(count)] for label, count in mix.items()],
+                right=(1,),
+            )
+        )

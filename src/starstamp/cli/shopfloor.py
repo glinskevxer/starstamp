@@ -11,10 +11,11 @@ from starstamp.model.calibration import (
     SystemCheck,
     normalise_system_code,
 )
-from starstamp.model.dates import parse_day
+from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.facility import Facility, Technician, normalise_badge, normalise_rin
 from starstamp.model.method import Method
 from starstamp.model.units import Expansion
+from starstamp.reporting import technician as technician_report
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.facility import FacilityRepository, TechnicianRepository
 from starstamp.text.table import dash, render_pairs, render_table, yes_no
@@ -250,3 +251,42 @@ def rig_status(shop: ShopContext, system_code: str, day: str | None) -> None:
     else:
         verdict = "within tolerance" if check.within_tolerance else "OUT OF TOLERANCE"
         click.echo(f"{check.describe()}, {verdict}")
+
+
+@tech.command("show")
+@click.argument("badge")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def show_technician(shop: ShopContext, badge: str, first: str | None, last: str | None) -> None:
+    """One person: what they hold and what they have been doing."""
+    start = parse_day(first) if first else StampedMonth.of(shop.today).first_day()
+    end = parse_day(last) if last else shop.today
+    with shop.open() as handle:
+        person = TechnicianRepository(handle.connection).by_badge(badge)
+        comparison = technician_report.build(handle, start, end)
+    click.echo(
+        render_pairs(
+            [
+                ("badge", person.badge),
+                ("name", person.name),
+                ("signed off", person.qualified_from.isoformat()),
+                ("until", dash(person.qualified_until)),
+                ("current", yes_no(person.qualified_on(shop.today))),
+                ("methods", ", ".join(sorted(item.label for item in person.methods))),
+            ]
+        )
+    )
+    for workload in comparison.workloads:
+        if workload.badge != person.badge:
+            continue
+        click.echo("")
+        click.echo(
+            f"{start.isoformat()} to {end.isoformat()}: {workload.performed} cylinders, "
+            f"{workload.condemned} condemned, {workload.starred} starred"
+        )
+        busiest = workload.busiest_day()
+        if busiest is not None:
+            click.echo(f"busiest day {busiest[0].isoformat()}, {busiest[1]} cylinders")
+        for label, count in workload.methods().items():
+            click.echo(f"  {count} x {label}")

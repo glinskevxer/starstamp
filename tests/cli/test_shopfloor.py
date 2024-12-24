@@ -109,3 +109,24 @@ def test_two_checks_the_same_day_are_refused(shop: Invoke) -> None:
 
 def test_a_rig_with_nothing_on_file(shop: Invoke) -> None:
     assert "no certificates on file" in shop("rig", "status", "WJ-9").output
+
+
+def test_showing_one_technician(shop: Invoke) -> None:
+    shop(
+        "tech",
+        "add",
+        "jt7",
+        "Jesse Tovar",
+        "--methods",
+        "volumetric,visual",
+        "--from",
+        "2022-03-01",
+    )
+    out = shop("--today", "2024-06-12", "tech", "show", "jt7").output
+    assert "Jesse Tovar" in out
+    assert "current     yes" in out
+    assert "external visual, volumetric" in out
+
+
+def test_showing_somebody_who_is_not_on_the_bench(shop: Invoke) -> None:
+    shop("tech", "show", "zz9", expect=3)
