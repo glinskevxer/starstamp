@@ -15,10 +15,12 @@ from dataclasses import dataclass
 from datetime import date
 
 from starstamp.errors import ConflictError
+from starstamp.model.contract import Contract
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.invoice import Invoice, InvoiceLine, due_date
 from starstamp.model.money import Money
 from starstamp.model.pricing import CONDEMNATION, HANDLING, PriceBook, code_for
+from starstamp.store.contracts import ContractRepository
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
@@ -53,6 +55,7 @@ class BillingService:
         self.invoices = InvoiceRepository(book.connection)
         self.owners = OwnerRepository(book.connection)
         self.prices = PriceRepository(book.connection)
+        self.contracts = ContractRepository(book.connection)
         self.lots = LotRepository(book.connection)
         self.cylinders = CylinderRepository(book.connection)
 
@@ -70,6 +73,7 @@ class BillingService:
             raise ConflictError("an invoice window ends after it starts")
         owner = self.owners.by_code(owner_code)
         book = self.prices.book()
+        contract = self.contracts.contract(owner.code)
         already = self.invoices.billed_event_ids(owner.code)
 
         lines: list[InvoiceLine] = []
@@ -79,7 +83,7 @@ class BillingService:
             if reason is not None:
                 skipped.append(f"{event.cylinder} {event.performed_on.isoformat()}: {reason}")
                 continue
-            lines.extend(self._lines_for(event, book))
+            lines.extend(self._lines_for(event, book, contract))
 
         for lot in self.lots.for_owner(owner.code):
             if first <= lot.received_on <= last:
@@ -88,7 +92,11 @@ class BillingService:
                         code=HANDLING,
                         description=f"handling {lot.number}",
                         performed_on=lot.received_on,
-                        unit=book.amount(HANDLING, lot.received_on),
+                        unit=contract.price(
+                            HANDLING,
+                            lot.received_on,
+                            book.amount(HANDLING, lot.received_on),
+                        ),
                     )
                 )
 
@@ -124,14 +132,19 @@ class BillingService:
             return "already billed"
         return None
 
-    def _lines_for(self, event: RequalificationEvent, book: PriceBook) -> list[InvoiceLine]:
+    def _lines_for(
+        self, event: RequalificationEvent, book: PriceBook, contract: Contract
+    ) -> list[InvoiceLine]:
+        """Price one record of test, at the account's price where it has one."""
         code = code_for(event.method)
         lines = [
             InvoiceLine(
                 code=code,
                 description=f"{event.method.label} requalification",
                 performed_on=event.performed_on,
-                unit=book.amount(code, event.performed_on),
+                unit=contract.price(
+                    code, event.performed_on, book.amount(code, event.performed_on)
+                ),
                 cylinder_key=str(event.cylinder),
                 event_id=event.event_id,
             )
@@ -142,7 +155,11 @@ class BillingService:
                     code=CONDEMNATION,
                     description="condemnation and disposal",
                     performed_on=event.performed_on,
-                    unit=book.amount(CONDEMNATION, event.performed_on),
+                    unit=contract.price(
+                        CONDEMNATION,
+                        event.performed_on,
+                        book.amount(CONDEMNATION, event.performed_on),
+                    ),
                     cylinder_key=str(event.cylinder),
                     event_id=event.event_id,
                 )

@@ -1,8 +1,10 @@
 from datetime import date
+from fractions import Fraction
 
 import pytest
 
 from starstamp.errors import ConflictError
+from starstamp.model.contract import ContractTerm
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind
 from starstamp.model.method import Method
@@ -11,7 +13,9 @@ from starstamp.model.pricing import PriceItem
 from starstamp.service.billing import BillingService
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.requalify import RequalificationRequest, RequalificationService
+from starstamp.store.contracts import ContractRepository
 from starstamp.store.db import Book
+from starstamp.store.owners import OwnerRepository
 from starstamp.store.pricing import PriceRepository
 
 from ..support.factories import make_observation, make_readings
@@ -133,3 +137,79 @@ def test_a_reversed_record_is_not_billed(priced: Book) -> None:
     draft = service.draft("WELD1", FIRST, LAST, RAISED)
     assert draft.is_empty
     assert "reversed" in draft.skipped[0]
+
+
+def test_an_agreed_flat_price_beats_the_book(priced: Book) -> None:
+    ContractRepository(priced.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="REQUAL_WJ",
+            effective_from=date(2023, 1, 1),
+            amount=Money.parse("12.00"),
+        ),
+        OwnerRepository(priced.connection).id_of("WELD1"),
+    )
+    requalify(priced)
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.total == Money.parse("12.00")
+
+
+def test_an_agreed_discount_comes_off_the_book(priced: Book) -> None:
+    ContractRepository(priced.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="REQUAL_WJ",
+            effective_from=date(2023, 1, 1),
+            discount_percent=Fraction(10),
+        ),
+        OwnerRepository(priced.connection).id_of("WELD1"),
+    )
+    requalify(priced)
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.total == Money.parse("13.05")
+
+
+def test_a_term_that_had_not_started_yet_is_not_used(priced: Book) -> None:
+    ContractRepository(priced.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="REQUAL_WJ",
+            effective_from=date(2025, 1, 1),
+            amount=Money.parse("12.00"),
+        ),
+        OwnerRepository(priced.connection).id_of("WELD1"),
+    )
+    requalify(priced)
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.total == Money.parse("14.50")
+
+
+def test_the_agreement_covers_handling_too(priced: Book) -> None:
+    ContractRepository(priced.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="HANDLING",
+            effective_from=date(2023, 1, 1),
+            amount=Money.parse("2.50"),
+        ),
+        OwnerRepository(priced.connection).id_of("WELD1"),
+    )
+    ReceivingService(priced).receive("WELD1", date(2024, 6, 3), [KEY])
+    requalify(priced)
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.total == Money.parse("17.00")
+
+
+def test_a_condemnation_line_takes_the_agreed_price(priced: Book) -> None:
+    ContractRepository(priced.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="CONDEMN",
+            effective_from=date(2023, 1, 1),
+            discount_percent=Fraction(50),
+        ),
+        OwnerRepository(priced.connection).id_of("WELD1"),
+    )
+    requalify(priced, observations=(make_observation(DefectKind.BULGE),))
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.invoice.by_code()["CONDEMN"] == Money.parse("4.50")
