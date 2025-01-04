@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 from datetime import date
+from fractions import Fraction
 
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.errors import NotFoundError
+from starstamp.model.contract import ContractTerm
 from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.invoice import Invoice
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem, normalise_charge_code
 from starstamp.service.billing import BillingService
+from starstamp.store.contracts import ContractRepository
 from starstamp.store.invoices import InvoiceRepository
+from starstamp.store.owners import OwnerRepository
 from starstamp.store.pricing import PriceRepository
 from starstamp.text.table import dash, render_pairs, render_table
 
@@ -210,3 +215,92 @@ def _render_invoice(found: Invoice, *, drafted: bool) -> None:
                 right=(3, 4, 5),
             )
         )
+
+
+@click.group()
+def contract() -> None:
+    """Prices agreed with one account."""
+
+
+@contract.command("agree")
+@click.argument("owner")
+@click.argument("code")
+@click.option("--price", default=None, help="a flat price for this code")
+@click.option("--discount", default=None, help="a percentage off the book instead")
+@click.option("--from", "effective_from", default=None, help="the day it starts")
+@pass_shop
+def agree(
+    shop: ShopContext,
+    owner: str,
+    code: str,
+    price: str | None,
+    discount: str | None,
+    effective_from: str | None,
+) -> None:
+    """Agree a price with an account, closing whatever it replaces."""
+    if (price is None) == (discount is None):
+        raise click.BadParameter("pass either --price or --discount, not both")
+    term = ContractTerm(
+        owner_code=owner.upper(),
+        code=normalise_charge_code(code),
+        effective_from=resolve_day(effective_from, shop),
+        amount=None if price is None else Money.parse(price),
+        discount_percent=None if discount is None else Fraction(discount.rstrip("%")),
+    )
+    with shop.open_for_write() as handle:
+        owner_id = OwnerRepository(handle.connection).id_of(term.owner_code)
+        ContractRepository(handle.connection).agree(term, owner_id)
+    click.echo(f"agreed {term} from {term.effective_from}")
+
+
+@contract.command("show")
+@click.argument("owner")
+@click.option("--on", "day", default=None, help="the day to read it for")
+@click.option("--history", is_flag=True, help="show closed terms too")
+@pass_shop
+def show_contract(shop: ShopContext, owner: str, day: str | None, history: bool) -> None:
+    """What an account has agreed."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        repository = ContractRepository(handle.connection)
+        terms = (
+            list(repository.contract(owner).terms) if history else repository.current(owner, when)
+        )
+        book = PriceRepository(handle.connection).book()
+    if not terms:
+        click.echo(f"{owner.upper()} pays the book price for everything")
+        return
+    rows = []
+    for term in terms:
+        try:
+            list_price = str(book.amount(term.code, when))
+        except NotFoundError:
+            list_price = "-"
+        rows.append(
+            [
+                term.code,
+                "flat" if term.is_flat else "discount",
+                str(term.amount)
+                if term.amount is not None
+                else f"{float(term.discount_percent or 0):.1f}%",
+                list_price,
+                term.effective_from.isoformat(),
+                dash(term.effective_until),
+            ]
+        )
+    click.echo(
+        render_table(["code", "kind", "agreed", "book", "from", "until"], rows, right=(2, 3))
+    )
+
+
+@contract.command("accounts")
+@pass_shop
+def accounts(shop: ShopContext) -> None:
+    """Which accounts have anything agreed."""
+    with shop.open() as handle:
+        found = ContractRepository(handle.connection).accounts_with_terms()
+    if not found:
+        click.echo("nothing agreed with anybody")
+        return
+    for code in found:
+        click.echo(code)

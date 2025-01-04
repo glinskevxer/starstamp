@@ -83,3 +83,51 @@ def test_billing_a_window_with_nothing_in_it(priced: Invoke) -> None:
 def test_the_window_defaults_to_this_month(priced: Invoke) -> None:
     out = priced("--today", "2024-06-30", "invoice", "draft", "weld1").output
     assert "2024-06-01 to 2024-06-30" in out
+
+
+def test_agreeing_a_flat_price(priced: Invoke) -> None:
+    out = priced(
+        "contract", "agree", "weld1", "requal-wj", "--price", "12.00", "--from", "2023-01-01"
+    ).output
+    assert "agreed WELD1 REQUAL_WJ at $12.00" in out
+    draft = priced(
+        "--today", "2024-07-01", "invoice", "draft", "weld1", "--month", "2024-06"
+    ).output
+    assert "total    $12.00" in draft
+
+
+def test_agreeing_a_discount(priced: Invoke) -> None:
+    priced("contract", "agree", "weld1", "REQUAL_WJ", "--discount", "10", "--from", "2023-01-01")
+    out = priced("--today", "2024-06-12", "contract", "show", "weld1").output
+    assert "discount" in out
+    assert "10.0%" in out
+    assert "14.50" in out
+
+
+def test_a_term_needs_one_of_the_two(priced: Invoke) -> None:
+    priced("contract", "agree", "weld1", "REQUAL_WJ", expect=2)
+    priced(
+        "contract",
+        "agree",
+        "weld1",
+        "REQUAL_WJ",
+        "--price",
+        "12.00",
+        "--discount",
+        "10",
+        expect=2,
+    )
+
+
+def test_an_account_with_nothing_agreed(priced: Invoke) -> None:
+    assert "pays the book price" in priced("contract", "show", "weld1").output
+    assert "nothing agreed with anybody" in priced("contract", "accounts").output
+
+
+def test_the_history_shows_closed_terms(priced: Invoke) -> None:
+    priced("contract", "agree", "weld1", "REQUAL_WJ", "--price", "12.00", "--from", "2023-01-01")
+    priced("contract", "agree", "weld1", "REQUAL_WJ", "--price", "13.00", "--from", "2025-01-01")
+    out = priced("contract", "show", "weld1", "--history").output
+    assert "2024-12-31" in out
+    assert "13.00" in out
+    assert "WELD1" in priced("contract", "accounts").output
