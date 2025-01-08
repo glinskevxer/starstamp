@@ -14,6 +14,7 @@ from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.invoice import Invoice
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem, normalise_charge_code
+from starstamp.reporting import aging, statement
 from starstamp.service.billing import BillingService
 from starstamp.store.contracts import ContractRepository
 from starstamp.store.invoices import InvoiceRepository
@@ -304,3 +305,29 @@ def accounts(shop: ShopContext) -> None:
         return
     for code in found:
         click.echo(code)
+
+
+@invoice.command("statement")
+@click.argument("owner")
+@click.option("--month", default=None, help="the month to state, YYYY-MM")
+@click.option("--from", "first", default=None)
+@click.option("--to", "last", default=None)
+@pass_shop
+def statement_command(
+    shop: ShopContext, owner: str, month: str | None, first: str | None, last: str | None
+) -> None:
+    """The statement an account gets at the end of the month."""
+    start, end = _window(shop, month, first, last)
+    with shop.open() as handle:
+        built = statement.build(handle, owner, start, end, shop.today)
+    click.echo(statement.render(built))
+
+
+@invoice.command("aging")
+@click.option("--on", "day", default=None, help="the day to age it at")
+@pass_shop
+def aging_command(shop: ShopContext, day: str | None) -> None:
+    """Who owes what, and for how long."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        click.echo(aging.render(aging.build(handle, when)))

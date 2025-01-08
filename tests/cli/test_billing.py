@@ -131,3 +131,34 @@ def test_the_history_shows_closed_terms(priced: Invoke) -> None:
     assert "2024-12-31" in out
     assert "13.00" in out
     assert "WELD1" in priced("contract", "accounts").output
+
+
+def test_the_statement(priced: Invoke) -> None:
+    priced("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06")
+    out = priced(
+        "--today", "2024-08-15", "invoice", "statement", "weld1", "--month", "2024-07"
+    ).output
+    assert "WELD1 Cascade Welding Supply" in out
+    assert "invoiced     $14.50" in out
+    assert "outstanding  $14.50" in out
+    assert "I2024-0001" in out
+
+
+def test_the_statement_counts_the_work(priced: Invoke) -> None:
+    out = priced(
+        "--today", "2024-08-15", "invoice", "statement", "weld1", "--month", "2024-06"
+    ).output
+    assert "requalified  1" in out
+    assert "condemned    0" in out
+
+
+def test_the_aging_report(priced: Invoke) -> None:
+    priced("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06")
+    out = priced("--today", "2024-09-15", "invoice", "aging").output
+    assert "WELD1" in out
+    assert "31 to 60" in out
+    assert "outstanding across 1 accounts" in out
+
+
+def test_the_aging_report_with_nothing_owed(priced: Invoke) -> None:
+    assert "nothing outstanding" in priced("invoice", "aging").output
