@@ -5,13 +5,14 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.calibration import (
     Certificate,
     InstrumentKind,
     SystemCheck,
     normalise_system_code,
 )
-from starstamp.model.dates import StampedMonth, parse_day
+from starstamp.model.dates import parse_day
 from starstamp.model.facility import Facility, Technician, normalise_badge, normalise_rin
 from starstamp.model.method import Method
 from starstamp.model.units import Expansion
@@ -260,8 +261,8 @@ def rig_status(shop: ShopContext, system_code: str, day: str | None) -> None:
 @pass_shop
 def show_technician(shop: ShopContext, badge: str, first: str | None, last: str | None) -> None:
     """One person: what they hold and what they have been doing."""
-    start = parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         person = TechnicianRepository(handle.connection).by_badge(badge)
         comparison = technician_report.build(handle, start, end)

@@ -12,7 +12,7 @@ from pathlib import Path
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop
-from starstamp.model.dates import StampedMonth, parse_day
+from starstamp.cli.windows import resolve as resolve_window
 from starstamp.reporting import export
 
 
@@ -48,8 +48,8 @@ def cylinders(shop: ShopContext, owner: str | None, out: Path | None) -> None:
 @pass_shop
 def records(shop: ShopContext, first: str | None, last: str | None, out: Path | None) -> None:
     """Records of test in a window."""
-    start = parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         text = export.events_csv(handle, start, end)
     _emit(text, out)

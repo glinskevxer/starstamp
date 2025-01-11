@@ -5,9 +5,8 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.cylinder import CylinderKey
-from starstamp.model.dates import StampedMonth, parse_day
-from starstamp.model.dates import parse_day as _parse_day
 from starstamp.reporting import audit, condemnation, fleet, rig, technician, throughput
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
@@ -46,8 +45,8 @@ def throughput_report(
     shop: ShopContext, first: str | None, last: str | None, grouping: str
 ) -> None:
     """What the shop got through in a window."""
-    start = parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         events = throughput.standing_between(handle, start, end)
     click.echo(f"{start.isoformat()} to {end.isoformat()}")
@@ -87,8 +86,8 @@ def rig_report(
     shop: ShopContext, system_code: str | None, first: str | None, last: str | None
 ) -> None:
     """How the test systems are doing."""
-    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = _parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         if system_code:
             standings = [rig.build(handle, system_code.upper(), start, end)]
@@ -131,8 +130,8 @@ def floor(shop: ShopContext, owner: str) -> None:
 @pass_shop
 def condemnation_report(shop: ShopContext, first: str | None, last: str | None) -> None:
     """What was condemned, and what those cylinders had in common."""
-    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = _parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         analysis = condemnation.build(handle, start, end)
     click.echo(condemnation.render(analysis))
@@ -183,8 +182,8 @@ def bench_sheet(shop: ShopContext, day: str | None) -> None:
 @pass_shop
 def technician_report(shop: ShopContext, first: str | None, last: str | None) -> None:
     """What each person got through, and who sits away from the middle."""
-    start = _parse_day(first) if first else StampedMonth.of(shop.today).first_day()
-    end = _parse_day(last) if last else shop.today
+    window = resolve_window(shop.today, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         comparison = technician.build(handle, start, end)
     click.echo(f"{start.isoformat()} to {end.isoformat()}")

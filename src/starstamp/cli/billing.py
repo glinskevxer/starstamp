@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date
 from fractions import Fraction
 
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.windows import resolve as resolve_window
 from starstamp.errors import NotFoundError
 from starstamp.model.contract import ContractTerm
-from starstamp.model.dates import StampedMonth, parse_day
 from starstamp.model.invoice import Invoice
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem, normalise_charge_code
@@ -106,7 +105,8 @@ def draft_invoice(
     shop: ShopContext, owner: str, month: str | None, first: str | None, last: str | None
 ) -> None:
     """Show what an account owes without raising anything."""
-    start, end = _window(shop, month, first, last)
+    window = resolve_window(shop.today, month=month, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         draft = BillingService(handle).draft(owner.upper(), start, end, shop.today)
     _render_invoice(draft.invoice, drafted=True)
@@ -124,7 +124,8 @@ def raise_invoice(
     shop: ShopContext, owner: str, month: str | None, first: str | None, last: str | None
 ) -> None:
     """Raise an invoice for an account."""
-    start, end = _window(shop, month, first, last)
+    window = resolve_window(shop.today, month=month, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open_for_write() as handle:
         written = BillingService(handle).raise_invoice(owner.upper(), start, end, shop.today)
     click.echo(f"raised {written}")
@@ -178,19 +179,6 @@ def outstanding(shop: ShopContext) -> None:
             right=(4, 5),
         )
     )
-
-
-def _window(
-    shop: ShopContext, month: str | None, first: str | None, last: str | None
-) -> tuple[date, date]:
-    if month is not None:
-        year, _, number = month.partition("-")
-        stamped = StampedMonth(int(year), int(number))
-        return stamped.first_day(), stamped.last_day()
-    if first is None or last is None:
-        stamped = StampedMonth.of(shop.today)
-        return stamped.first_day(), stamped.last_day()
-    return parse_day(first), parse_day(last)
 
 
 def _render_invoice(found: Invoice, *, drafted: bool) -> None:
@@ -317,7 +305,8 @@ def statement_command(
     shop: ShopContext, owner: str, month: str | None, first: str | None, last: str | None
 ) -> None:
     """The statement an account gets at the end of the month."""
-    start, end = _window(shop, month, first, last)
+    window = resolve_window(shop.today, month=month, first=first, last=last)
+    start, end = window.first, window.last
     with shop.open() as handle:
         built = statement.build(handle, owner, start, end, shop.today)
     click.echo(statement.render(built))
