@@ -23,6 +23,7 @@ from starstamp.cli.repairs import repair
 from starstamp.cli.report import report
 from starstamp.cli.requal import requal
 from starstamp.cli.restate import restate
+from starstamp.cli.schedule import book
 from starstamp.cli.shopfloor import facility, rig, tech
 from starstamp.errors import (
     ConflictError,
@@ -145,6 +146,7 @@ cli.add_command(export_group)
 cli.add_command(check)
 cli.add_command(stats)
 cli.add_command(scrap)
+cli.add_command(book)
 
 
 def run() -> int:
