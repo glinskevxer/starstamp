@@ -188,3 +188,20 @@ def test_the_technician_report(tested: Invoke) -> None:
 def test_the_technician_report_of_a_quiet_window(tested: Invoke) -> None:
     out = tested("report", "technicians", "--from", "2023-01-01", "--to", "2023-12-31").output
     assert "nobody did any work" in out
+
+
+def test_the_forecast(tested: Invoke) -> None:
+    tested("price", "set", "REQUAL_WJ", "14.50", "--from", "2023-01-01")
+    out = tested("report", "forecast", "--on", "2034-01-01", "--months", "12").output
+    assert "1 cylinders due over 1 months" in out
+    assert "2034-06" in out
+    assert "WELD1 1" in out
+
+
+def test_the_forecast_with_nothing_in_it(running_shop: Invoke) -> None:  # noqa: F811
+    assert "nothing falls due" in running_shop("report", "forecast").output
+
+
+def test_the_forecast_counts_what_is_already_out_of_test(tested: Invoke) -> None:
+    out = tested("report", "forecast", "--on", "2035-01-01").output
+    assert "1 already out of test" in out

@@ -7,7 +7,15 @@ import click
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.cylinder import CylinderKey
-from starstamp.reporting import audit, condemnation, fleet, rig, technician, throughput
+from starstamp.reporting import (
+    audit,
+    condemnation,
+    fleet,
+    forecast,
+    rig,
+    technician,
+    throughput,
+)
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
 from starstamp.text.table import render_table
@@ -198,3 +206,15 @@ def technician_report(shop: ShopContext, first: str | None, last: str | None) ->
                 right=(1,),
             )
         )
+
+
+@report.command("forecast")
+@click.option("--months", default=24, show_default=True, help="how far ahead to look")
+@click.option("--on", "day", default=None, help="the day to count from")
+@pass_shop
+def forecast_report(shop: ShopContext, months: int, day: str | None) -> None:
+    """What is coming, from the due dates already in the book."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        built = forecast.build(handle, when, months)
+    click.echo(forecast.render(built))

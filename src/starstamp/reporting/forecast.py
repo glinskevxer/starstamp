@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from starstamp.errors import NotFoundError
 from starstamp.model.cylinder import CylinderStatus
 from starstamp.model.dates import StampedMonth
 from starstamp.model.money import Money, total
@@ -103,7 +104,9 @@ def build(book: Book, from_day: date, months: int) -> Forecast:
         code = code_for(row.last_pass.method)
         try:
             list_price = prices.amount(code, from_day)
-        except Exception:  # noqa: BLE001 - an unpriced code forecasts at nothing
+        except NotFoundError:
+            # A code with no price yet forecasts at nothing rather than
+            # stopping the whole report, because the count is still useful.
             list_price = Money.zero()
         agreed = contracts.contract(cylinder.owner_code).price(code, from_day, list_price)
         buckets.setdefault(row.due.long_form(), []).append((cylinder.owner_code, agreed))

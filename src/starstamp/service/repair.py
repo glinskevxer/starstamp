@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from starstamp.errors import RuleViolationError
+from starstamp.errors import RuleViolationError, ValidationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.repair import Repair, RepairKind
@@ -29,14 +29,19 @@ from starstamp.store.repairs import RepairRepository
 CITATION = "49 CFR 180.211"
 
 
-def _outlet_in(parts: str) -> Outlet | None:
-    """Find a CGA number anywhere in a parts line."""
+def outlet_in(parts: str) -> Outlet | None:
+    """Find a CGA number anywhere in a parts line.
+
+    A number the shop does not stock reads as no outlet at all rather than as
+    an error, so the caller can say what it wants about the whole parts line
+    instead of about one token in it.
+    """
     for token in parts.replace(",", " ").split():
         cleaned = token.strip().upper().removeprefix("CGA")
         if cleaned.isdigit():
             try:
                 return parse_outlet(cleaned)
-            except Exception:  # noqa: BLE001 - an unknown number is simply not an outlet
+            except ValidationError:
                 return None
     return None
 
@@ -134,7 +139,7 @@ class RepairService:
         is allowed to do, so the outlet is not left in a free text field where
         nothing can read it.
         """
-        outlet = _outlet_in(parts)
+        outlet = outlet_in(parts)
         if outlet is None:
             raise RuleViolationError(
                 f"a valve change has to name the outlet fitted, as in CGA 580, not {parts!r}",

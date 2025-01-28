@@ -90,3 +90,33 @@ def test_an_unpriced_code_forecasts_at_nothing(shop_book: Book) -> None:
     built = forecast.build(shop_book, date(2034, 1, 1), 12)
     assert built.cylinders == 1
     assert built.value == Money.zero()
+
+
+def test_a_condemned_cylinder_is_not_forecast(shop_book: Book) -> None:
+    from starstamp.model.cylinder import CylinderStatus
+    from starstamp.store.cylinders import CylinderRepository
+
+    priced(shop_book)
+    requalify(shop_book)
+    CylinderRepository(shop_book.connection).set_status(KEY, CylinderStatus.CONDEMNED)
+    assert forecast.build(shop_book, date(2034, 1, 1), 12).cylinders == 0
+
+
+def test_an_agreed_price_shows_in_the_value(shop_book: Book) -> None:
+    from starstamp.model.contract import ContractTerm
+    from starstamp.store.contracts import ContractRepository
+    from starstamp.store.owners import OwnerRepository
+
+    priced(shop_book)
+    requalify(shop_book)
+    ContractRepository(shop_book.connection).add(
+        ContractTerm(
+            owner_code="WELD1",
+            code="REQUAL_WJ",
+            effective_from=date(2023, 1, 1),
+            amount=Money.parse("12.00"),
+        ),
+        OwnerRepository(shop_book.connection).id_of("WELD1"),
+    )
+    built = forecast.build(shop_book, date(2034, 1, 1), 12)
+    assert built.value == Money.parse("12.00")

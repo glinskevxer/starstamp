@@ -151,3 +151,24 @@ def test_a_service_change_to_the_gas_it_is_already_in(shop_book: Book) -> None:
 
     with pytest.raises(ConflictError, match="already in nitrogen"):
         CylinderRepository(shop_book.connection).change_service(KEY, NITROGEN)
+
+
+def test_an_outlet_is_found_anywhere_in_the_parts_line() -> None:
+    from starstamp.service.repair import outlet_in
+
+    assert outlet_in("CGA 580 brass") is not None
+    assert outlet_in("brass, 580, new") is not None
+    assert outlet_in("580") is not None
+
+
+def test_a_parts_line_with_no_outlet_in_it() -> None:
+    from starstamp.service.repair import outlet_in
+
+    assert outlet_in("brass one") is None
+    assert outlet_in("") is None
+
+
+def test_a_number_the_shop_does_not_stock_is_not_an_outlet() -> None:
+    from starstamp.service.repair import outlet_in
+
+    assert outlet_in("CGA 999") is None
