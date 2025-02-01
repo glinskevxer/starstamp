@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def tested(running_shop: Invoke) -> Invoke:  # noqa: F811
+def tested(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",

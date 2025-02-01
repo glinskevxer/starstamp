@@ -1,5 +1,4 @@
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 def requalify(shop: Invoke, *extra: str, expect: int = 0) -> None:
@@ -24,7 +23,7 @@ def requalify(shop: Invoke, *extra: str, expect: int = 0) -> None:
     )
 
 
-def test_ordinary_work(running_shop: Invoke) -> None:  # noqa: F811
+def test_ordinary_work(running_shop: Invoke) -> None:
     out = running_shop(
         "repair", "do", "NCI/A4471", "paint", "--tech", "jt7", "--on", "2024-06-14"
     ).output
@@ -32,21 +31,21 @@ def test_ordinary_work(running_shop: Invoke) -> None:  # noqa: F811
     assert "requalify before filling" not in out
 
 
-def test_work_on_the_metal_sends_it_back(running_shop: Invoke) -> None:  # noqa: F811
+def test_work_on_the_metal_sends_it_back(running_shop: Invoke) -> None:
     out = running_shop(
         "repair", "do", "NCI/A4471", "heat treat", "--tech", "jt7", "--on", "2024-06-14"
     ).output
     assert "requalify before filling" in out
 
 
-def test_a_repair_the_cylinder_does_not_take(running_shop: Invoke) -> None:  # noqa: F811
+def test_a_repair_the_cylinder_does_not_take(running_shop: Invoke) -> None:
     result = running_shop(
         "repair", "do", "NCI/A4471", "weld", "--tech", "jt7", "--on", "2024-06-14", expect=5
     )
     assert "condemns it" in result.output
 
 
-def test_clearing_a_hold(running_shop: Invoke) -> None:  # noqa: F811
+def test_clearing_a_hold(running_shop: Invoke) -> None:
     requalify(running_shop, "--defect", "threads")
     assert "NCI/A4471" in running_shop("repair", "held").output
     out = running_shop(
@@ -56,7 +55,7 @@ def test_clearing_a_hold(running_shop: Invoke) -> None:  # noqa: F811
     assert "nothing held" in running_shop("repair", "held").output
 
 
-def test_the_history(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_history(running_shop: Invoke) -> None:
     assert "no repairs on NCI/A4471" in running_shop("repair", "history", "NCI/A4471").output
     running_shop(
         "repair",
@@ -75,20 +74,20 @@ def test_the_history(running_shop: Invoke) -> None:  # noqa: F811
     assert "CGA 580 brass" in out
 
 
-def test_a_valve_change_without_the_valve(running_shop: Invoke) -> None:  # noqa: F811
+def test_a_valve_change_without_the_valve(running_shop: Invoke) -> None:
     result = running_shop(
         "repair", "do", "NCI/A4471", "valve", "--tech", "jt7", "--on", "2024-06-14", expect=5
     )
     assert "has to name the outlet fitted" in result.output
 
 
-def test_the_options_for_a_cylinder(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_options_for_a_cylinder(running_shop: Invoke) -> None:
     out = running_shop("repair", "options", "NCI/A4471").output
     assert "DOT-3AA2015" in out
     assert "heat treatment" in out
     assert "weld repair" not in out
 
 
-def test_the_options_name_a_hold(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_options_name_a_hold(running_shop: Invoke) -> None:
     requalify(running_shop, "--defect", "threads")
     assert "held since 2024-06-12" in running_shop("repair", "options", "NCI/A4471").output

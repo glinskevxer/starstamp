@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def condemned(running_shop: Invoke) -> Invoke:  # noqa: F811
+def condemned(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",
@@ -48,7 +47,7 @@ def test_rendering_a_cylinder(condemned: Invoke) -> None:
     assert "scrapped" in condemned("cylinder", "show", "NCI/A4471").output
 
 
-def test_a_cylinder_that_was_not_condemned(running_shop: Invoke) -> None:  # noqa: F811
+def test_a_cylinder_that_was_not_condemned(running_shop: Invoke) -> None:
     result = running_shop(
         "scrap", "render", "NCI/A4471", "drill", "--tech", "jt7", "--on", "2024-06-20", expect=5
     )
@@ -64,7 +63,7 @@ def test_what_is_waiting(condemned: Invoke) -> None:
     assert "LATE" in late
 
 
-def test_nothing_waiting(running_shop: Invoke) -> None:  # noqa: F811
+def test_nothing_waiting(running_shop: Invoke) -> None:
     assert "nothing waiting" in running_shop("scrap", "outstanding").output
 
 

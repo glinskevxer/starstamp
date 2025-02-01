@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def tested(running_shop: Invoke) -> Invoke:  # noqa: F811
+def tested(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",
@@ -42,7 +41,7 @@ def test_a_gas_that_needs_its_own_cylinder_is_refused(tested: Invoke) -> None:
     assert "needs a cylinder dedicated to it" in result.output
 
 
-def test_an_untested_cylinder_is_refused(running_shop: Invoke) -> None:  # noqa: F811
+def test_an_untested_cylinder_is_refused(running_shop: Invoke) -> None:
     result = running_shop("--today", "2024-07-01", "fill", "check", "NCI/A4471", expect=6)
     assert "no standing requalification" in result.output
 

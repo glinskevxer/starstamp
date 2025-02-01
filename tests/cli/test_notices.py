@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def condemned(running_shop: Invoke) -> Invoke:  # noqa: F811
+def condemned(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",
@@ -51,7 +50,7 @@ def test_listing_and_sending(condemned: Invoke) -> None:
     assert "no notices" in condemned("notice", "list", "--unsent").output
 
 
-def test_nothing_to_draft(running_shop: Invoke) -> None:  # noqa: F811
+def test_nothing_to_draft(running_shop: Invoke) -> None:
     assert "nothing to write" in running_shop("notice", "draft").output
 
 
@@ -62,7 +61,7 @@ def test_late_letters(condemned: Invoke) -> None:
     assert "NCI/A4471 condemnation, not sent" in late
 
 
-def test_reminders(running_shop: Invoke) -> None:  # noqa: F811
+def test_reminders(running_shop: Invoke) -> None:
     running_shop(
         "requal",
         "run",

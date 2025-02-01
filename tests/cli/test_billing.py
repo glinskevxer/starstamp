@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def priced(running_shop: Invoke) -> Invoke:  # noqa: F811
+def priced(running_shop: Invoke) -> Invoke:
     for code, amount, description in (
         ("REQUAL_WJ", "14.50", "water jacket requalification"),
         ("CONDEMN", "9.00", "condemnation and disposal"),
@@ -47,7 +46,7 @@ def test_raising_a_price_keeps_the_old_one(priced: Invoke) -> None:
     assert "16.00" in history
 
 
-def test_no_prices_at_all(running_shop: Invoke) -> None:  # noqa: F811
+def test_no_prices_at_all(running_shop: Invoke) -> None:
     assert "no prices on file" in running_shop("price", "list").output
 
 

@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def counter(running_shop: Invoke) -> Invoke:  # noqa: F811
+def counter(running_shop: Invoke) -> Invoke:
     running_shop(
         "cylinder",
         "register",
@@ -73,7 +72,7 @@ def test_the_open_list_flags_a_late_lot(counter: Invoke) -> None:
     assert "5 days past the promise" in out
 
 
-def test_nothing_in_the_shop(running_shop: Invoke) -> None:  # noqa: F811
+def test_nothing_in_the_shop(running_shop: Invoke) -> None:
     assert "nothing in the shop" in running_shop("lot", "open").output
 
 
@@ -120,5 +119,5 @@ def test_the_history_for_an_account(counter: Invoke) -> None:
     assert "1 returned, 17.0 days on average" in out
 
 
-def test_no_lots_for_an_account(running_shop: Invoke) -> None:  # noqa: F811
+def test_no_lots_for_an_account(running_shop: Invoke) -> None:
     assert "no lots for WELD1" in running_shop("lot", "history", "weld1").output

@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def tested(running_shop: Invoke) -> Invoke:  # noqa: F811
+def tested(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",
@@ -33,7 +32,7 @@ def test_the_packet_prints(tested: Invoke) -> None:
     assert "packet drawn 2026-01-04" in out
 
 
-def test_a_packet_for_a_cylinder_with_no_tests(running_shop: Invoke) -> None:  # noqa: F811
+def test_a_packet_for_a_cylinder_with_no_tests(running_shop: Invoke) -> None:
     assert "no records of test" in running_shop("report", "packet", "NCI/A4471").output
 
 
@@ -110,7 +109,7 @@ def test_the_floor_report(tested: Invoke) -> None:
     )
 
 
-def test_the_condemnation_report(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_condemnation_report(running_shop: Invoke) -> None:
     running_shop(
         "requal",
         "run",
@@ -143,7 +142,7 @@ def test_a_quiet_condemnation_report(tested: Invoke) -> None:
     assert "nothing condemned" in out
 
 
-def test_the_bench_sheet(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_bench_sheet(running_shop: Invoke) -> None:
     assert "nothing on the bench" in running_shop("report", "bench").output
     running_shop(
         "lot", "receive", "weld1", "NCI/A4471", "--on", "2024-06-03", "--promised", "2024-06-28"
@@ -154,7 +153,7 @@ def test_the_bench_sheet(running_shop: Invoke) -> None:  # noqa: F811
     assert "in_shop" in out
 
 
-def test_the_bench_sheet_shows_what_a_cylinder_is_held_for(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_bench_sheet_shows_what_a_cylinder_is_held_for(running_shop: Invoke) -> None:
     running_shop("lot", "receive", "weld1", "NCI/A4471", "--on", "2024-06-03")
     running_shop(
         "requal",
@@ -198,7 +197,7 @@ def test_the_forecast(tested: Invoke) -> None:
     assert "WELD1 1" in out
 
 
-def test_the_forecast_with_nothing_in_it(running_shop: Invoke) -> None:  # noqa: F811
+def test_the_forecast_with_nothing_in_it(running_shop: Invoke) -> None:
     assert "nothing falls due" in running_shop("report", "forecast").output
 
 

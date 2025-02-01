@@ -18,6 +18,7 @@ from starstamp.cli.disposal import scrap
 from starstamp.cli.export import export_group
 from starstamp.cli.fill import fill
 from starstamp.cli.lots import lot
+from starstamp.cli.maintain import backup, restore, vacuum, verify
 from starstamp.cli.notices import notice
 from starstamp.cli.repairs import repair
 from starstamp.cli.report import report
@@ -147,6 +148,10 @@ cli.add_command(check)
 cli.add_command(stats)
 cli.add_command(scrap)
 cli.add_command(book)
+cli.add_command(backup)
+cli.add_command(restore)
+cli.add_command(verify)
+cli.add_command(vacuum)
 
 
 def run() -> int:

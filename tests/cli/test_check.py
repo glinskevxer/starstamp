@@ -1,11 +1,10 @@
 import pytest
 
-from .conftest import Invoke
-from .test_endtoend import DAY, running_shop  # noqa: F401
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
-def condemned(running_shop: Invoke) -> Invoke:  # noqa: F811
+def condemned(running_shop: Invoke) -> Invoke:
     running_shop(
         "requal",
         "run",
@@ -28,7 +27,7 @@ def condemned(running_shop: Invoke) -> Invoke:  # noqa: F811
     return running_shop
 
 
-def test_a_clean_book_checks_out(running_shop: Invoke) -> None:  # noqa: F811
+def test_a_clean_book_checks_out(running_shop: Invoke) -> None:
     assert "nothing to answer for" in running_shop("check").output
 
 
