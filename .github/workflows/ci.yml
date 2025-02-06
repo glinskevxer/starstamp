@@ -76,6 +76,8 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: apply every migration to a scratch book
         run: python -m starstamp.tools.check_migrations
+      - name: every reference has something to look it up by
+        run: python -m starstamp.tools.check_indexes
 
   cli:
     runs-on: ubuntu-latest
