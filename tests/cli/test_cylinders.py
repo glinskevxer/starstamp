@@ -214,3 +214,34 @@ def test_a_valve_change_needs_a_technician_on_the_bench(stocked: Invoke) -> None
         expect=3,
     )
     assert "no technician JT7" in result.output
+
+
+def test_the_life_of_a_cylinder(stocked: Invoke) -> None:
+    stocked("cylinder", "wall", "NCI/A4471", "0.214", "--on", "2024-06-11")
+    out = stocked("--today", "2024-06-20", "cylinder", "life", "NCI/A4471").output
+    assert "0.214 in from ultrasonic sweep" in out
+    assert "26 years" in out
+
+
+def test_the_life_of_a_cylinder_nothing_happened_to(stocked: Invoke) -> None:
+    assert "nothing has happened to it here" in stocked("cylinder", "life", "NCI/A4471").output
+
+
+def test_filtering_the_life(stocked: Invoke) -> None:
+    stocked("cylinder", "wall", "NCI/A4471", "0.214", "--on", "2024-06-11")
+    out = stocked("cylinder", "life", "NCI/A4471", "--only", "wall").output
+    assert "0.214" in out
+    assert (
+        "nothing of that kind" in stocked("cylinder", "life", "NCI/A4471", "--only", "test").output
+    )
+
+
+def test_the_age_profile(stocked: Invoke) -> None:
+    out = stocked("--today", "2024-06-20", "cylinder", "age").output
+    assert "1990s" in out
+    assert "oldest is NCI/A4471" in out
+    assert "26 years" in out
+
+
+def test_the_age_profile_of_an_empty_book(shop: Invoke) -> None:
+    assert "no cylinders" in shop("cylinder", "age").output

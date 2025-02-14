@@ -15,6 +15,7 @@ from starstamp.model.service import lookup_service
 from starstamp.model.specification import parse_specification
 from starstamp.model.units import Expansion
 from starstamp.model.valve import outlet_for_service, parse_outlet
+from starstamp.reporting import life
 from starstamp.rules.method_matrix import permitted_methods, required_test_pressure
 from starstamp.service.imports import ImportService
 from starstamp.store.cylinders import CylinderRepository
@@ -269,3 +270,53 @@ def change_service(shop: ShopContext, key: str, gas: str) -> None:
         moved = CylinderRepository(handle.connection).change_service(wanted, service)
     needed = outlet_for_service(moved.service.code)
     click.echo(f"{moved.key} is now in {moved.service} service and needs {needed}")
+
+
+@cylinder.command("life")
+@click.argument("key")
+@click.option("--only", default=None, help="one kind of entry: test, repair, notice, wall")
+@pass_shop
+def cylinder_life(shop: ShopContext, key: str, only: str | None) -> None:
+    """Everything the book holds about one cylinder, in order."""
+    wanted = CylinderKey.parse(key)
+    with shop.open() as handle:
+        built = life.build(handle, wanted)
+    if only is None:
+        click.echo(life.render(built, shop.today))
+        return
+    entries = built.of_kind(only.strip().lower())
+    if not entries:
+        click.echo(f"nothing of that kind for {wanted}")
+        return
+    for entry in entries:
+        click.echo(f"{entry.day.isoformat()}  {entry.reference or '-'}  {entry.detail}")
+
+
+@cylinder.command("age")
+@click.option("--owner", default=None, help="only this account's cylinders")
+@pass_shop
+def age_profile(shop: ShopContext, owner: str | None) -> None:
+    """How old the fleet is, by decade of manufacture."""
+    with shop.open() as handle:
+        repository = CylinderRepository(handle.connection)
+        if owner is not None:
+            fleet = repository.for_owner(owner.upper())
+        else:
+            fleet = [item for status in CylinderStatus for item in repository.with_status(status)]
+    if not fleet:
+        click.echo("no cylinders")
+        return
+    counts: dict[str, int] = {}
+    for item in fleet:
+        decade = (item.manufactured.year // 10) * 10
+        counts[f"{decade}s"] = counts.get(f"{decade}s", 0) + 1
+    click.echo(
+        render_table(
+            ["made", "cylinders"],
+            [[label, str(count)] for label, count in sorted(counts.items())],
+            right=(1,),
+        )
+    )
+    oldest = min(fleet, key=lambda item: (item.manufactured.year, item.manufactured.month))
+    years = shop.today.year - oldest.manufactured.year
+    click.echo(f"oldest is {oldest.key}, made {oldest.manufactured.long_form()}, {years} years")
