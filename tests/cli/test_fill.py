@@ -59,3 +59,61 @@ def test_nothing_due(tested: Invoke) -> None:
 def test_the_due_list_by_owner(tested: Invoke) -> None:
     out = tested("--today", "2034-04-01", "fill", "due", "--owner", "weld1").output
     assert "WELD1" in out
+
+
+def test_recording_a_fill(tested: Invoke) -> None:
+    out = tested(
+        "fill", "record", "NCI/A4471", "--by", "jt7", "--to", "2015", "--on", "2024-06-20"
+    ).output
+    assert "NCI/A4471 nitrogen 2015 psig at 70F" in out
+
+
+def test_a_fill_the_shop_would_refuse(running_shop: Invoke) -> None:
+    result = running_shop(
+        "fill",
+        "record",
+        "NCI/A4471",
+        "--by",
+        "jt7",
+        "--to",
+        "2015",
+        "--on",
+        "2024-06-20",
+        expect=5,
+    )
+    assert "may not be filled" in result.output
+
+
+def test_recording_it_anyway(running_shop: Invoke) -> None:
+    out = running_shop(
+        "fill",
+        "record",
+        "NCI/A4471",
+        "--by",
+        "jt7",
+        "--to",
+        "2015",
+        "--on",
+        "2024-06-20",
+        "--anyway",
+    ).output
+    assert "recorded over a refusal" in out
+
+
+def test_an_overfill_shows_in_the_log(tested: Invoke) -> None:
+    tested("fill", "record", "NCI/A4471", "--by", "jt7", "--to", "2600", "--on", "2024-06-20")
+    out = tested("fill", "log", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "overfilled" in out
+    only = tested("fill", "log", "--from", "2024-06-01", "--to", "2024-06-30", "--overfills").output
+    assert "NCI/A4471" in only
+
+
+def test_the_log_for_one_cylinder(tested: Invoke) -> None:
+    tested("fill", "record", "NCI/A4471", "--by", "jt7", "--to", "2015", "--on", "2024-06-20")
+    out = tested("fill", "log", "NCI/A4471").output
+    assert "2024-06-20" in out
+    assert "within" in out
+
+
+def test_an_empty_log(tested: Invoke) -> None:
+    assert "nothing in the fill log" in tested("fill", "log").output
