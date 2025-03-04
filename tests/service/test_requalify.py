@@ -358,3 +358,25 @@ def test_an_acetylene_examination_with_no_weighing(shop_book: Book) -> None:
         RequalificationService(shop_book).perform(
             a_request(key=key, method=Method.ACETYLENE_VISUAL, readings=None, system_code=None)
         )
+
+
+def test_the_shop_can_hold_longer_than_the_regulation(shop_book: Book) -> None:
+    from starstamp.model.settings import MINIMUM_HOLD
+    from starstamp.store.settings import SettingRepository
+
+    SettingRepository(shop_book.connection).set(MINIMUM_HOLD, "60", date(2024, 1, 1))
+    with pytest.raises(RuleViolationError, match="short of the 60s"):
+        RequalificationService(shop_book).perform(
+            a_request(readings=make_readings(hold_seconds=45))
+        )
+
+
+def test_a_longer_hold_only_applies_from_the_day_it_was_set(shop_book: Book) -> None:
+    from starstamp.model.settings import MINIMUM_HOLD
+    from starstamp.store.settings import SettingRepository
+
+    SettingRepository(shop_book.connection).set(MINIMUM_HOLD, "60", date(2025, 1, 1))
+    result = RequalificationService(shop_book).perform(
+        a_request(readings=make_readings(hold_seconds=45))
+    )
+    assert result.outcome is Outcome.PASS

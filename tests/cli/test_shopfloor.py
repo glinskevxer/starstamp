@@ -130,3 +130,14 @@ def test_showing_one_technician(shop: Invoke) -> None:
 
 def test_showing_somebody_who_is_not_on_the_bench(shop: Invoke) -> None:
     shop("tech", "show", "zz9", expect=3)
+
+
+def test_the_check_takes_the_shop_tolerance(shop: Invoke) -> None:
+    out = shop("rig", "check", "WJ-1", "40.0", "39.5", "--on", "2024-06-12").output
+    assert "OUT OF TOLERANCE" in out
+
+
+def test_a_wider_tolerance_lets_it_through(shop: Invoke) -> None:
+    shop("setting", "set", "check_tolerance_percent", "2", "--from", "2024-01-01")
+    out = shop("rig", "check", "WJ-1", "40.0", "39.5", "--on", "2024-06-12").output
+    assert "within tolerance" in out

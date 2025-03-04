@@ -115,3 +115,23 @@ def test_an_account_that_is_not_open(shop_book: Book) -> None:
 
     with pytest.raises(NotFoundError):
         ScheduleService(shop_book).book_in("FIRE7", DAY, 1, TODAY)
+
+
+def test_the_shop_can_set_what_one_rig_gets_through(shop_book: Book) -> None:
+    from starstamp.model.settings import CAPACITY_PER_RIG
+    from starstamp.store.settings import SettingRepository
+
+    SettingRepository(shop_book.connection).set(CAPACITY_PER_RIG, "40", date(2024, 1, 1))
+    service = ScheduleService(shop_book)
+    assert service.per_rig(DAY) == 40
+    assert service.capacity(DAY).capacity == 40
+
+
+def test_a_capacity_set_later_does_not_reach_back(shop_book: Book) -> None:
+    from starstamp.model.settings import CAPACITY_PER_RIG
+    from starstamp.store.settings import SettingRepository
+
+    SettingRepository(shop_book.connection).set(CAPACITY_PER_RIG, "40", date(2025, 1, 1))
+    service = ScheduleService(shop_book)
+    assert service.capacity(DAY).capacity == PER_RIG_PER_DAY
+    assert service.capacity(date(2025, 6, 1)).capacity == 40

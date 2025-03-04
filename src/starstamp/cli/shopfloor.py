@@ -15,10 +15,12 @@ from starstamp.model.calibration import (
 from starstamp.model.dates import parse_day
 from starstamp.model.facility import Facility, Technician, normalise_badge, normalise_rin
 from starstamp.model.method import Method
+from starstamp.model.settings import CHECK_TOLERANCE
 from starstamp.model.units import Expansion
 from starstamp.reporting import technician as technician_report
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.facility import FacilityRepository, TechnicianRepository
+from starstamp.store.settings import SettingRepository
 from starstamp.text.table import dash, render_pairs, render_table, yes_no
 
 
@@ -210,14 +212,17 @@ def daily_check(
     tech: str | None,
 ) -> None:
     """Record the start of day run of the calibrated cylinder."""
-    check = SystemCheck(
-        system_code=normalise_system_code(system_code),
-        day=resolve_day(day, shop),
-        expected=Expansion.parse(expected),
-        observed=Expansion.parse(observed),
-        technician_badge=None if tech is None else normalise_badge(tech),
-    )
+    when = resolve_day(day, shop)
     with shop.open_for_write() as handle:
+        tolerance = SettingRepository(handle.connection).settings().fraction(CHECK_TOLERANCE, when)
+        check = SystemCheck(
+            system_code=normalise_system_code(system_code),
+            day=when,
+            expected=Expansion.parse(expected),
+            observed=Expansion.parse(observed),
+            tolerance_percent=tolerance,
+            technician_badge=None if tech is None else normalise_badge(tech),
+        )
         CalibrationRepository(handle.connection).record_check(check)
     verdict = "within tolerance" if check.within_tolerance else "OUT OF TOLERANCE"
     click.echo(f"{check.describe()}, {verdict}")

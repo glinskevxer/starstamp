@@ -15,13 +15,16 @@ from datetime import date, timedelta
 from starstamp.errors import ConflictError, RuleViolationError
 from starstamp.model.booking import Booking, DayCapacity
 from starstamp.model.calibration import InstrumentKind
+from starstamp.model.settings import CAPACITY_PER_RIG
 from starstamp.store.bookings import BookingRepository
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.db import Book
 from starstamp.store.lots import LotRepository
 from starstamp.store.owners import OwnerRepository
+from starstamp.store.settings import SettingRepository
 
 CITATION = "shop capacity"
+# What one rig gets through on an ordinary day, before the shop says otherwise.
 PER_RIG_PER_DAY = 24
 
 
@@ -47,6 +50,7 @@ class ScheduleService:
         self.calibration = CalibrationRepository(book.connection)
         self.owners = OwnerRepository(book.connection)
         self.lots = LotRepository(book.connection)
+        self.settings = SettingRepository(book.connection)
 
     def working_rigs(self, day: date) -> list[str]:
         """Test systems whose pressure instruments are in date on a day."""
@@ -59,11 +63,15 @@ class ScheduleService:
                 working.append(system)
         return working
 
+    def per_rig(self, day: date) -> int:
+        """What one rig gets through in a day, as the shop has set it."""
+        return self.settings.integer(CAPACITY_PER_RIG, day)
+
     def capacity(self, day: date) -> DayCapacity:
         rigs = len(self.working_rigs(day))
         return DayCapacity(
             day=day,
-            capacity=rigs * PER_RIG_PER_DAY,
+            capacity=rigs * self.per_rig(day),
             booked=self.bookings.booked_on_day(day),
         )
 

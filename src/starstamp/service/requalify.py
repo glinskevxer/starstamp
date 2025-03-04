@@ -28,6 +28,7 @@ from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import Observation
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.method import Method
+from starstamp.model.settings import MINIMUM_HOLD
 from starstamp.model.testrecord import PressureReadings
 from starstamp.model.ultrasonic import Scan
 from starstamp.rules import validity as validity_rules
@@ -47,6 +48,7 @@ from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
 from starstamp.store.facility import FacilityRepository, TechnicianRepository
+from starstamp.store.settings import SettingRepository
 
 CITATION = "49 CFR 180.205"
 
@@ -106,6 +108,7 @@ class RequalificationService:
         self.facilities = FacilityRepository(book.connection)
         self.technicians = TechnicianRepository(book.connection)
         self.calibration = CalibrationRepository(book.connection)
+        self.settings = SettingRepository(book.connection)
 
     def perform(self, request: RequalificationRequest) -> RequalificationResult:
         cylinder = self.cylinders.by_key(request.key)
@@ -205,7 +208,12 @@ class RequalificationService:
                 f"{method.label} needs the rig's readings before an event can be written",
                 CITATION,
             )
-        return evaluate(cylinder, method, request.readings)
+        return evaluate(
+            cylinder,
+            method,
+            request.readings,
+            minimum_hold_seconds=self.settings.integer(MINIMUM_HOLD, request.day),
+        )
 
     def _run_scan(
         self,

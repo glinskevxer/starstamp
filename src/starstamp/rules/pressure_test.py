@@ -85,7 +85,13 @@ def check_pressure_reached(cylinder: Cylinder, readings: PressureReadings) -> No
         )
 
 
-def evaluate(cylinder: Cylinder, method: Method, readings: PressureReadings) -> PressureOutcome:
+def evaluate(
+    cylinder: Cylinder,
+    method: Method,
+    readings: PressureReadings,
+    *,
+    minimum_hold_seconds: int = MINIMUM_HOLD_SECONDS,
+) -> PressureOutcome:
     """Judge one pressure test.
 
     A refusal here means the test was not performed properly and there is no
@@ -94,10 +100,10 @@ def evaluate(cylinder: Cylinder, method: Method, readings: PressureReadings) -> 
     repeated, the second ends the cylinder.
     """
     readings.require_for(method)
-    if not readings.held_long_enough:
+    if readings.hold_seconds < minimum_hold_seconds:
         raise RuleViolationError(
             f"{cylinder.key} was held {readings.hold_seconds}s, short of the "
-            f"{MINIMUM_HOLD_SECONDS}s the test calls for",
+            f"{minimum_hold_seconds}s the test calls for",
             CITATION,
         )
     check_pressure_reached(cylinder, readings)

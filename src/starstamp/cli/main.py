@@ -25,6 +25,7 @@ from starstamp.cli.report import report
 from starstamp.cli.requal import requal
 from starstamp.cli.restate import restate
 from starstamp.cli.schedule import book
+from starstamp.cli.settings import setting
 from starstamp.cli.shopfloor import facility, rig, tech
 from starstamp.errors import (
     ConflictError,
@@ -152,6 +153,7 @@ cli.add_command(backup)
 cli.add_command(restore)
 cli.add_command(verify)
 cli.add_command(vacuum)
+cli.add_command(setting)
 
 
 def run() -> int:
