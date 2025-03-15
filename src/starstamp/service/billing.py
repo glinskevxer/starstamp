@@ -14,12 +14,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from starstamp.errors import ConflictError
+from starstamp.errors import ConflictError, NotFoundError
 from starstamp.model.contract import Contract
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.model.invoice import Invoice, InvoiceLine, due_date
 from starstamp.model.money import Money
 from starstamp.model.pricing import CONDEMNATION, HANDLING, PriceBook, code_for
+from starstamp.model.settings import STORAGE_FREE_DAYS
+from starstamp.rules.storage import STORAGE_CODE, days_for
 from starstamp.store.contracts import ContractRepository
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
@@ -28,6 +30,7 @@ from starstamp.store.invoices import InvoiceRepository
 from starstamp.store.lots import LotRepository
 from starstamp.store.owners import OwnerRepository
 from starstamp.store.pricing import PriceRepository
+from starstamp.store.settings import SettingRepository
 
 BILLABLE = {Outcome.PASS, Outcome.CONDEMN}
 
@@ -56,6 +59,7 @@ class BillingService:
         self.owners = OwnerRepository(book.connection)
         self.prices = PriceRepository(book.connection)
         self.contracts = ContractRepository(book.connection)
+        self.settings = SettingRepository(book.connection)
         self.lots = LotRepository(book.connection)
         self.cylinders = CylinderRepository(book.connection)
 
@@ -85,7 +89,30 @@ class BillingService:
                 continue
             lines.extend(self._lines_for(event, book, contract))
 
+        free_days = self.settings.integer(STORAGE_FREE_DAYS, raised_on)
         for lot in self.lots.for_owner(owner.code):
+            if lot.returned_on is not None and first <= lot.returned_on <= last:
+                held = days_for(lot, lot.returned_on, free_days)
+                if held.is_chargeable:
+                    try:
+                        rate = contract.price(
+                            STORAGE_CODE,
+                            lot.returned_on,
+                            book.amount(STORAGE_CODE, lot.returned_on),
+                        )
+                    except NotFoundError:
+                        skipped.append(f"{lot.number}: {held.describe()}, no storage rate")
+                        rate = Money.zero()
+                    if rate.cents:
+                        lines.append(
+                            InvoiceLine(
+                                code=STORAGE_CODE,
+                                description=f"storage on {lot.number}",
+                                performed_on=lot.returned_on,
+                                unit=rate,
+                                count=held.chargeable_days,
+                            )
+                        )
             if first <= lot.received_on <= last:
                 lines.append(
                     InvoiceLine(

@@ -213,3 +213,73 @@ def test_a_condemnation_line_takes_the_agreed_price(priced: Book) -> None:
     requalify(priced, observations=(make_observation(DefectKind.BULGE),))
     draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
     assert draft.invoice.by_code()["CONDEMN"] == Money.parse("4.50")
+
+
+def test_storage_is_charged_when_the_lot_goes_back(priced: Book) -> None:
+    PriceRepository(priced.connection).add(
+        PriceItem(
+            code="STORAGE",
+            description="storage per cylinder day",
+            amount=Money.parse("0.25"),
+            effective_from=date(2023, 1, 1),
+        )
+    )
+    receiving = ReceivingService(priced)
+    receiving.receive("WELD1", date(2024, 5, 1), [KEY])
+    requalify(priced)
+    receiving.ready("L2024-0001")
+    receiving.return_lot("L2024-0001", date(2024, 6, 20))
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    storage = draft.invoice.by_code().get("STORAGE")
+    assert storage == Money.parse("5.00")
+
+
+def test_a_lot_returned_inside_the_free_period_is_not_charged(priced: Book) -> None:
+    PriceRepository(priced.connection).add(
+        PriceItem(
+            code="STORAGE",
+            description="storage per cylinder day",
+            amount=Money.parse("0.25"),
+            effective_from=date(2023, 1, 1),
+        )
+    )
+    receiving = ReceivingService(priced)
+    receiving.receive("WELD1", date(2024, 6, 3), [KEY])
+    requalify(priced)
+    receiving.ready("L2024-0001")
+    receiving.return_lot("L2024-0001", date(2024, 6, 20))
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert "STORAGE" not in draft.invoice.by_code()
+
+
+def test_storage_with_no_rate_on_the_book_is_left_off(priced: Book) -> None:
+    receiving = ReceivingService(priced)
+    receiving.receive("WELD1", date(2024, 5, 1), [KEY])
+    requalify(priced)
+    receiving.ready("L2024-0001")
+    receiving.return_lot("L2024-0001", date(2024, 6, 20))
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert "STORAGE" not in draft.invoice.by_code()
+    assert any("no storage rate" in item for item in draft.skipped)
+
+
+def test_a_shorter_free_period_charges_more(priced: Book) -> None:
+    from starstamp.model.settings import STORAGE_FREE_DAYS
+    from starstamp.store.settings import SettingRepository
+
+    PriceRepository(priced.connection).add(
+        PriceItem(
+            code="STORAGE",
+            description="storage per cylinder day",
+            amount=Money.parse("0.25"),
+            effective_from=date(2023, 1, 1),
+        )
+    )
+    SettingRepository(priced.connection).set(STORAGE_FREE_DAYS, "10", date(2024, 1, 1))
+    receiving = ReceivingService(priced)
+    receiving.receive("WELD1", date(2024, 5, 1), [KEY])
+    requalify(priced)
+    receiving.ready("L2024-0001")
+    receiving.return_lot("L2024-0001", date(2024, 6, 20))
+    draft = BillingService(priced).draft("WELD1", FIRST, LAST, RAISED)
+    assert draft.invoice.by_code()["STORAGE"] == Money.parse("10.00")

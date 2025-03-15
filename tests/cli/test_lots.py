@@ -121,3 +121,17 @@ def test_the_history_for_an_account(counter: Invoke) -> None:
 
 def test_no_lots_for_an_account(running_shop: Invoke) -> None:
     assert "no lots for WELD1" in running_shop("lot", "history", "weld1").output
+
+
+def test_the_storage_list(counter: Invoke) -> None:
+    out = counter("lot", "storage", "--on", "2024-06-20").output
+    assert "nothing has been here longer than 30 days" in out
+    later = counter("lot", "storage", "--on", "2024-07-20").output
+    assert "L2024-0001" in later
+    assert "17" in later
+
+
+def test_the_storage_list_follows_the_setting(counter: Invoke) -> None:
+    counter("setting", "set", "storage_free_days", "7", "--from", "2024-01-01")
+    out = counter("lot", "storage", "--on", "2024-06-20").output
+    assert "L2024-0001" in out

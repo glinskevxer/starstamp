@@ -7,8 +7,11 @@ import click
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.lot import LotStatus
+from starstamp.model.settings import STORAGE_FREE_DAYS
+from starstamp.rules.storage import chargeable
 from starstamp.service.receiving import ReceivingService
 from starstamp.store.lots import LotRepository
+from starstamp.store.settings import SettingRepository
 from starstamp.text.table import dash, render_pairs, render_table
 
 
@@ -191,3 +194,36 @@ def lot_history(shop: ShopContext, owner: str) -> None:
     if finished:
         average = sum(item.days_in_shop(shop.today) for item in finished) / len(finished)
         click.echo(f"{len(finished)} returned, {average:.1f} days on average")
+
+
+@lot.command("storage")
+@click.option("--on", "day", default=None, help="the day to count to")
+@click.option("--owner", default=None, help="only this account")
+@pass_shop
+def storage(shop: ShopContext, day: str | None, owner: str | None) -> None:
+    """Lots that have been in the way longer than the free period."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        repository = LotRepository(handle.connection)
+        found = repository.for_owner(owner) if owner else repository.open_lots()
+        free_days = SettingRepository(handle.connection).integer(STORAGE_FREE_DAYS, when)
+        charging = chargeable(found, when, free_days)
+    if not charging:
+        click.echo(f"nothing has been here longer than {free_days} days")
+        return
+    click.echo(
+        render_table(
+            ["lot", "owner", "received", "held", "chargeable"],
+            [
+                [
+                    item.lot_number,
+                    item.owner_code,
+                    item.received_on.isoformat(),
+                    str(item.days_held),
+                    str(item.chargeable_days),
+                ]
+                for item in charging
+            ],
+            right=(3, 4),
+        )
+    )
