@@ -9,6 +9,7 @@ from starstamp.model.cylinder import CylinderKey
 from starstamp.model.lot import LotStatus
 from starstamp.model.settings import STORAGE_FREE_DAYS
 from starstamp.rules.storage import chargeable
+from starstamp.service.abandoned import AbandonedService
 from starstamp.service.receiving import ReceivingService
 from starstamp.store.lots import LotRepository
 from starstamp.store.settings import SettingRepository
@@ -227,3 +228,44 @@ def storage(shop: ShopContext, day: str | None, owner: str | None) -> None:
             right=(3, 4),
         )
     )
+
+
+@lot.command("uncollected")
+@click.option("--on", "day", default=None, help="the day to read it for")
+@click.option("--write", is_flag=True, help="write to the accounts that are overdue")
+@pass_shop
+def uncollected(shop: ShopContext, day: str | None, write: bool) -> None:
+    """Lots that are ready and that nobody has come for."""
+    when = resolve_day(day, shop)
+    if write:
+        with shop.open_for_write() as handle:
+            service = AbandonedService(handle)
+            overdue = service.needing_a_letter(when)
+            for item in overdue:
+                service.write_to(item.lot.number, when)
+        click.echo(f"wrote to {len(overdue)} accounts")
+        return
+    with shop.open() as handle:
+        found = AbandonedService(handle).left_behind(when)
+    if not found:
+        click.echo("nothing is waiting to be collected")
+        return
+    click.echo(
+        render_table(
+            ["lot", "owner", "ready", "standing", "next step"],
+            [
+                [
+                    item.lot.number,
+                    item.lot.owner_code,
+                    str(item.standing.days_ready),
+                    item.standing.standing.value,
+                    dash(item.standing.next_step_on()),
+                ]
+                for item in found
+            ],
+            right=(2,),
+        )
+    )
+    for item in found:
+        if item.standing.standing.may_be_disposed_of:
+            click.echo(f"abandoned: {item.describe()}")

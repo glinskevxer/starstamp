@@ -135,3 +135,28 @@ def test_the_storage_list_follows_the_setting(counter: Invoke) -> None:
     counter("setting", "set", "storage_free_days", "7", "--from", "2024-01-01")
     out = counter("lot", "storage", "--on", "2024-06-20").output
     assert "L2024-0001" in out
+
+
+def test_the_uncollected_list(counter: Invoke) -> None:
+    requalify(counter, "NCI/A4471")
+    requalify(counter, "PST/B12")
+    counter("lot", "ready", "L2024-0001")
+    out = counter("lot", "uncollected", "--on", "2024-06-20").output
+    assert "L2024-0001" in out
+    assert "in_hand" in out
+    later = counter("lot", "uncollected", "--on", "2025-01-01").output
+    assert "overdue" in later
+
+
+def test_writing_to_the_overdue_accounts(counter: Invoke) -> None:
+    requalify(counter, "NCI/A4471")
+    requalify(counter, "PST/B12")
+    counter("lot", "ready", "L2024-0001")
+    out = counter("lot", "uncollected", "--on", "2025-01-01", "--write").output
+    assert "wrote to 1 accounts" in out
+    assert "written_to" in counter("lot", "uncollected", "--on", "2025-01-02").output
+    assert "uncollected" in counter("notice", "list").output
+
+
+def test_nothing_is_waiting(counter: Invoke) -> None:
+    assert "nothing is waiting to be collected" in counter("lot", "uncollected").output

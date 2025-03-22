@@ -24,6 +24,7 @@ class NoticeKind(Enum):
     DUE_SOON = "due_soon"
     OUT_OF_TEST = "out_of_test"
     HELD_FOR_REPAIR = "held_for_repair"
+    UNCOLLECTED = "uncollected"
 
     @property
     def is_required(self) -> bool:
