@@ -204,3 +204,18 @@ def test_the_forecast_with_nothing_in_it(running_shop: Invoke) -> None:
 def test_the_forecast_counts_what_is_already_out_of_test(tested: Invoke) -> None:
     out = tested("report", "forecast", "--on", "2035-01-01").output
     assert "1 already out of test" in out
+
+
+def test_the_month_end_pack(tested: Invoke) -> None:
+    tested("price", "set", "REQUAL_WJ", "14.50", "--from", "2023-01-01")
+    tested("--today", "2024-06-30", "invoice", "raise", "weld1", "--month", "2024-06")
+    out = tested("--today", "2024-07-01", "report", "close", "--month", "2024-06").output
+    assert "month             2024-06" in out
+    assert "invoiced          $14.50" in out
+    assert "outstanding       $14.50" in out
+
+
+def test_the_pack_defaults_to_this_month(tested: Invoke) -> None:
+    out = tested("--today", "2024-06-30", "report", "close").output
+    assert "2024-06" in out
+    assert "cylinders         1" in out

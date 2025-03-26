@@ -5,10 +5,13 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.windows import parse_month
 from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.cylinder import CylinderKey
+from starstamp.model.dates import StampedMonth
 from starstamp.reporting import (
     audit,
+    close,
     condemnation,
     fleet,
     forecast,
@@ -218,3 +221,14 @@ def forecast_report(shop: ShopContext, months: int, day: str | None) -> None:
     with shop.open() as handle:
         built = forecast.build(handle, when, months)
     click.echo(forecast.render(built))
+
+
+@report.command("close")
+@click.option("--month", default=None, help="the month to close, YYYY-MM")
+@pass_shop
+def close_report(shop: ShopContext, month: str | None) -> None:
+    """The month end pack: work, money and what is coming."""
+    stamped = parse_month(month) if month else StampedMonth.of(shop.today)
+    with shop.open() as handle:
+        pack = close.build(handle, stamped, shop.today)
+    click.echo(close.render(pack))

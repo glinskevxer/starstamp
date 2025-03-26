@@ -130,6 +130,14 @@ class InvoiceRepository(Repository):
         )
         return self.by_number(number)
 
+    def accounts_invoiced(self) -> list[str]:
+        """Every account that has ever been invoiced."""
+        rows = self._all(
+            "SELECT DISTINCT o.code AS code FROM invoice i"
+            " JOIN owner_account o ON o.id = i.owner_id ORDER BY o.code"
+        )
+        return [as_text(row["code"]) for row in rows]
+
     def billed_event_ids(self, owner_code: str) -> set[int]:
         """Every record of test already on an invoice for an account."""
         rows = self._all(
