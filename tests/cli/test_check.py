@@ -56,3 +56,16 @@ def test_stats_after_some_work(condemned: Invoke) -> None:
     out = condemned("stats").output
     assert "records of test  1" in out
     assert "condemned" in out
+
+
+def test_the_doctor_on_a_healthy_book(running_shop: Invoke) -> None:
+    out = running_shop("doctor").output
+    assert "ok  schema" in out
+    assert "ok  file" in out
+    assert "nothing to answer for" in out
+
+
+def test_the_doctor_exits_ten_on_a_problem(condemned: Invoke) -> None:
+    condemned("notice", "draft", "--on", "2024-06-13")
+    result = condemned("doctor", "--on", "2024-07-20", expect=10)
+    assert "FAILED  records" in result.output

@@ -6,6 +6,7 @@ import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.model.cylinder import CylinderStatus
+from starstamp.service.doctor import Doctor
 from starstamp.service.integrity import IntegrityService
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.cylinders import CylinderRepository
@@ -66,3 +67,16 @@ def stats(shop: ShopContext) -> None:
                 right=(1,),
             )
         )
+
+
+@click.command("doctor")
+@click.option("--on", "day", default=None, help="the day to read the records as of")
+@pass_shop
+def doctor(shop: ShopContext, day: str | None) -> None:
+    """Run every check there is, and say what each one found."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        report = Doctor(handle).run(when)
+    click.echo(report.describe())
+    if not report.is_clean:
+        raise SystemExit(10)

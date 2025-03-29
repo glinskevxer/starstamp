@@ -11,7 +11,7 @@ import click
 from starstamp import __version__
 from starstamp.cli.accounts import account
 from starstamp.cli.billing import contract, invoice, price
-from starstamp.cli.check import check, stats
+from starstamp.cli.check import check, doctor, stats
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.cli.cylinders import cylinder
 from starstamp.cli.disposal import scrap
@@ -147,6 +147,7 @@ cli.add_command(notice)
 cli.add_command(export_group)
 cli.add_command(check)
 cli.add_command(stats)
+cli.add_command(doctor)
 cli.add_command(scrap)
 cli.add_command(book)
 cli.add_command(backup)
