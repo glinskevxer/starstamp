@@ -3,17 +3,16 @@ from datetime import date
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem
 from starstamp.reporting import close
 from starstamp.service.billing import BillingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 from starstamp.store.pricing import PriceRepository
 
-from ..support.factories import make_cylinder, make_observation, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder, make_observation
+from ..support.requests import requalify
+from ..support.shop import stock
 
 KEY = CylinderKey("NCI", "A4471")
 JUNE = StampedMonth(2024, 6)
@@ -29,19 +28,6 @@ def priced(book: Book) -> None:
                 effective_from=date(2023, 1, 1),
             )
         )
-
-
-def requalify(book: Book, key: CylinderKey = KEY, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": key,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_quiet_month(shop_book: Book) -> None:
@@ -80,7 +66,7 @@ def test_a_settled_invoice_shows_as_settled(shop_book: Book) -> None:
 def test_condemnations_come_through(shop_book: Book) -> None:
     priced(shop_book)
     other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.BULGE),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.BULGE),))
     built = close.build(shop_book, JUNE, date(2024, 7, 1))
     assert built.tally.condemned == 1
     assert built.condemned.count == 1

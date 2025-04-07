@@ -7,19 +7,17 @@ from starstamp.errors import ConflictError
 from starstamp.model.contract import ContractTerm
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem
 from starstamp.service.billing import BillingService
 from starstamp.service.receiving import ReceivingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.contracts import ContractRepository
 from starstamp.store.db import Book
 from starstamp.store.owners import OwnerRepository
 from starstamp.store.pricing import PriceRepository
 
-from ..support.factories import make_observation, make_readings
-from ..support.shop import DAY, SYSTEM
+from ..support.factories import make_observation
+from ..support.requests import requalify
 
 KEY = CylinderKey("NCI", "A4471")
 FIRST = date(2024, 6, 1)
@@ -45,19 +43,6 @@ def priced(shop_book: Book) -> Book:
             )
         )
     return shop_book
-
-
-def requalify(book: Book, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": KEY,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_pass_is_one_line(priced: Book) -> None:

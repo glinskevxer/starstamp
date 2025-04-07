@@ -4,32 +4,16 @@ import pytest
 
 from starstamp.errors import NotFoundError, RuleViolationError
 from starstamp.model.cylinder import CylinderKey
-from starstamp.model.method import Method
 from starstamp.model.service import NITROGEN, OXYGEN
 from starstamp.model.units import Pressure
 from starstamp.rules.filling import FillVerdict
 from starstamp.service.filling import FillingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 
-from ..support.factories import make_readings
-from ..support.shop import DAY, SYSTEM
+from ..support.requests import requalify
 
 KEY = CylinderKey("NCI", "A4471")
 FILLED = date(2024, 6, 20)
-
-
-def requalify(book: Book) -> None:
-    RequalificationService(book).perform(
-        RequalificationRequest(
-            key=KEY,
-            day=DAY,
-            technician_badge="JT7",
-            method=Method.VOLUMETRIC,
-            system_code=SYSTEM,
-            readings=make_readings(),
-        )
-    )
 
 
 def test_a_fill_on_a_cylinder_in_test(shop_book: Book) -> None:

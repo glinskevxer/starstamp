@@ -4,31 +4,17 @@ from fractions import Fraction
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.reporting import condemnation
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
 
-from ..support.factories import make_cylinder, make_observation, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder, make_observation
+from ..support.requests import requalify
+from ..support.shop import stock
 
 KEY = CylinderKey("NCI", "A4471")
 FIRST = date(2024, 1, 1)
 LAST = date(2024, 12, 31)
-
-
-def requalify(book: Book, key: CylinderKey = KEY, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": key,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_quiet_window(shop_book: Book) -> None:
@@ -54,7 +40,7 @@ def test_grouping(shop_book: Book) -> None:
         make_cylinder(key=CylinderKey("PST", "B12"), manufactured=StampedMonth(2014, 3)),
     )
     requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.CRACK),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.CRACK),))
     analysis = condemnation.build(shop_book, FIRST, LAST)
     assert analysis.count == 2
     assert set(analysis.by_cause()) == {"bulge", "crack"}
@@ -69,7 +55,7 @@ def test_the_average_age_is_exact(shop_book: Book) -> None:
         make_cylinder(key=CylinderKey("PST", "B12"), manufactured=StampedMonth(2014, 3)),
     )
     requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.CRACK),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.CRACK),))
     analysis = condemnation.build(shop_book, FIRST, LAST)
     assert analysis.average_age() == Fraction(36, 2)
 
@@ -80,7 +66,7 @@ def test_the_oldest_one(shop_book: Book) -> None:
         make_cylinder(key=CylinderKey("PST", "B12"), manufactured=StampedMonth(2014, 3)),
     )
     requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.CRACK),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.CRACK),))
     oldest = condemnation.build(shop_book, FIRST, LAST).oldest()
     assert oldest is not None
     assert oldest.cylinder.key == KEY

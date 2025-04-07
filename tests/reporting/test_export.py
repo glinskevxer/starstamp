@@ -3,32 +3,18 @@ import io
 from datetime import date
 
 from starstamp.model.cylinder import CylinderKey
-from starstamp.model.method import Method
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem
 from starstamp.reporting import export
 from starstamp.service.billing import BillingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 from starstamp.store.pricing import PriceRepository
 
-from ..support.factories import make_cylinder, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder
+from ..support.requests import requalify
+from ..support.shop import stock
 
 KEY = CylinderKey("NCI", "A4471")
-
-
-def requalify(book: Book, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": KEY,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def parse(text: str) -> list[dict[str, str]]:

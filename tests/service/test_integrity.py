@@ -2,31 +2,17 @@ from datetime import date
 
 from starstamp.model.cylinder import CylinderKey, CylinderStatus
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.service.integrity import IntegrityService, Severity
 from starstamp.service.notices import NoticeService
 from starstamp.service.receiving import ReceivingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 
-from ..support.factories import make_observation, make_readings
-from ..support.shop import DAY, SYSTEM
+from ..support.factories import make_observation
+from ..support.requests import requalify
+from ..support.shop import DAY
 
 KEY = CylinderKey("NCI", "A4471")
-
-
-def requalify(book: Book, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": KEY,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_clean_book(shop_book: Book) -> None:

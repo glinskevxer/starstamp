@@ -6,32 +6,18 @@ from starstamp.errors import ConflictError
 from starstamp.model.cylinder import CylinderKey, CylinderStatus
 from starstamp.model.defect import DefectKind
 from starstamp.model.lot import LotStatus
-from starstamp.model.method import Method
 from starstamp.model.owner import OwnerAccount
 from starstamp.service.receiving import ReceivingService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.owners import OwnerRepository
 
-from ..support.factories import make_cylinder, make_observation, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder, make_observation
+from ..support.requests import requalify
+from ..support.shop import stock
 
 KEY = CylinderKey("NCI", "A4471")
 RECEIVED = date(2024, 6, 3)
-
-
-def requalify(book: Book, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": KEY,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_receiving_books_the_lot_and_moves_the_cylinders(shop_book: Book) -> None:

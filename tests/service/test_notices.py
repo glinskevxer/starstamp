@@ -2,29 +2,15 @@ from datetime import date
 
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.model.notice import NoticeKind
 from starstamp.service.notices import NoticeService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 
-from ..support.factories import make_cylinder, make_observation, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder, make_observation
+from ..support.requests import requalify
+from ..support.shop import DAY, stock
 
 KEY = CylinderKey("NCI", "A4471")
-
-
-def requalify(book: Book, key: CylinderKey = KEY, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": key,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_condemnation_produces_a_letter(shop_book: Book) -> None:
@@ -70,7 +56,7 @@ def test_a_cylinder_already_out_of_test_gets_a_different_letter(shop_book: Book)
 def test_reminders_can_be_narrowed_to_an_account(shop_book: Book) -> None:
     requalify(shop_book)
     other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
-    requalify(shop_book, other)
+    requalify(shop_book, key=other)
     service = NoticeService(shop_book)
     assert service.draft_reminders(date(2034, 4, 1), 3, owner_code="WELD1").count == 2
 

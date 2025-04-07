@@ -1,16 +1,15 @@
 from datetime import date
 
 from starstamp.model.cylinder import CylinderKey
-from starstamp.model.method import Method
 from starstamp.model.money import Money
 from starstamp.model.pricing import PriceItem
 from starstamp.reporting import forecast
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 from starstamp.store.pricing import PriceRepository
 
-from ..support.factories import make_cylinder, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder
+from ..support.requests import requalify
+from ..support.shop import DAY, stock
 
 KEY = CylinderKey("NCI", "A4471")
 
@@ -22,19 +21,6 @@ def priced(book: Book) -> None:
             description="water jacket requalification",
             amount=Money.parse("14.50"),
             effective_from=date(2023, 1, 1),
-        )
-    )
-
-
-def requalify(book: Book, key: CylinderKey = KEY) -> None:
-    RequalificationService(book).perform(
-        RequalificationRequest(
-            key=key,
-            day=DAY,
-            technician_badge="JT7",
-            method=Method.VOLUMETRIC,
-            system_code=SYSTEM,
-            readings=make_readings(),
         )
     )
 
@@ -74,7 +60,7 @@ def test_the_busiest_month_breaks_down_by_account(shop_book: Book) -> None:
     priced(shop_book)
     other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
     requalify(shop_book)
-    requalify(shop_book, other)
+    requalify(shop_book, key=other)
     built = forecast.build(shop_book, date(2034, 1, 1), 12)
     busiest = built.busiest()
     assert busiest is not None

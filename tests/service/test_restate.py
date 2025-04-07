@@ -6,30 +6,15 @@ from starstamp.errors import ConflictError, ValidationError
 from starstamp.model.calibration import InstrumentKind
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.event import EventState, Outcome
-from starstamp.model.method import Method
 from starstamp.model.service import NITROGEN
 from starstamp.service.fill import FillService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.service.restate import RestatementService
 from starstamp.store.db import Book
 
-from ..support.factories import make_readings
-from ..support.shop import DAY, SYSTEM
+from ..support.requests import requalify
+from ..support.shop import SYSTEM
 
 KEY = CylinderKey("NCI", "A4471")
-
-
-def requalify(book: Book, day: date = DAY) -> None:
-    RequalificationService(book).perform(
-        RequalificationRequest(
-            key=KEY,
-            day=day,
-            technician_badge="JT7",
-            method=Method.VOLUMETRIC,
-            system_code=SYSTEM,
-            readings=make_readings(),
-        )
-    )
 
 
 def certificate_id(book: Book) -> int:

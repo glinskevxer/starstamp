@@ -3,32 +3,18 @@ from fractions import Fraction
 
 from starstamp.model.calibration import InstrumentKind
 from starstamp.model.cylinder import CylinderKey
-from starstamp.model.method import Method
 from starstamp.model.units import Expansion
 from starstamp.reporting import rig
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.db import Book
 
 from ..support.factories import make_certificate, make_check, make_readings
+from ..support.requests import requalify
 from ..support.shop import DAY, SYSTEM
 
 KEY = CylinderKey("NCI", "A4471")
 FIRST = date(2024, 6, 1)
 LAST = date(2024, 6, 30)
-
-
-def requalify(book: Book, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": KEY,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_a_quiet_rig(shop_book: Book) -> None:

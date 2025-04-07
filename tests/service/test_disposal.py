@@ -6,34 +6,19 @@ from starstamp.errors import RuleViolationError
 from starstamp.model.cylinder import CylinderKey, CylinderStatus
 from starstamp.model.defect import DefectKind
 from starstamp.model.disposal import DisposalMethod
-from starstamp.model.method import Method
 from starstamp.service.disposal import DisposalService
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 
-from ..support.factories import make_observation, make_readings
-from ..support.shop import DAY, SYSTEM
+from ..support.factories import make_observation
+from ..support.requests import requalify
+from ..support.shop import DAY
 
 KEY = CylinderKey("NCI", "A4471")
 
 
-def condemn(book: Book) -> None:
-    RequalificationService(book).perform(
-        RequalificationRequest(
-            key=KEY,
-            day=DAY,
-            technician_badge="JT7",
-            method=Method.VOLUMETRIC,
-            system_code=SYSTEM,
-            readings=make_readings(),
-            observations=(make_observation(DefectKind.BULGE),),
-        )
-    )
-
-
 def test_a_condemned_cylinder_is_drilled_and_scrapped(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     disposal = DisposalService(shop_book).dispose(
         KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "JT7", scrap_ticket="SC-4411"
     )
@@ -42,7 +27,7 @@ def test_a_condemned_cylinder_is_drilled_and_scrapped(shop_book: Book) -> None:
 
 
 def test_holding_one_for_its_owner_leaves_it_condemned(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     DisposalService(shop_book).dispose(KEY, DisposalMethod.HELD_FOR_OWNER, date(2024, 6, 20), "JT7")
     assert CylinderRepository(shop_book.connection).by_key(KEY).status is CylinderStatus.CONDEMNED
 
@@ -59,7 +44,7 @@ def test_a_cylinder_condemned_by_hand_with_no_record(shop_book: Book) -> None:
 
 
 def test_the_clock_runs_from_the_record_of_test(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     disposal = DisposalService(shop_book).dispose(
         KEY, DisposalMethod.CRUSHED, date(2024, 7, 20), "JT7"
     )
@@ -69,7 +54,7 @@ def test_the_clock_runs_from_the_record_of_test(shop_book: Book) -> None:
 
 
 def test_what_is_still_outstanding(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     service = DisposalService(shop_book)
     waiting = service.outstanding(date(2024, 6, 20))
     assert len(waiting) == 1
@@ -80,7 +65,7 @@ def test_what_is_still_outstanding(shop_book: Book) -> None:
 
 
 def test_late_ones_are_flagged(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     service = DisposalService(shop_book)
     assert service.late(date(2024, 7, 12)) == []
     late = service.late(date(2024, 7, 13))
@@ -89,14 +74,14 @@ def test_late_ones_are_flagged(shop_book: Book) -> None:
 
 
 def test_a_dealt_with_cylinder_drops_off_the_list(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     service = DisposalService(shop_book)
     service.dispose(KEY, DisposalMethod.HELD_FOR_OWNER, date(2024, 6, 20), "JT7")
     assert service.outstanding(date(2024, 6, 21)) == []
 
 
 def test_a_cylinder_going_home_is_rendered_first(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     disposal = DisposalService(shop_book).dispose(
         KEY,
         DisposalMethod.NECK_CUT,
@@ -110,7 +95,7 @@ def test_a_cylinder_going_home_is_rendered_first(shop_book: Book) -> None:
 
 
 def test_the_badges_are_normalised_and_checked(shop_book: Book) -> None:
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     disposal = DisposalService(shop_book).dispose(
         KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "jt7", witness_badge="mr2"
     )
@@ -121,6 +106,6 @@ def test_the_badges_are_normalised_and_checked(shop_book: Book) -> None:
 def test_a_technician_who_is_not_on_the_bench(shop_book: Book) -> None:
     from starstamp.errors import NotFoundError
 
-    condemn(shop_book)
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
     with pytest.raises(NotFoundError, match="no technician ZZ9"):
         DisposalService(shop_book).dispose(KEY, DisposalMethod.DRILLED, date(2024, 6, 20), "zz9")

@@ -2,29 +2,15 @@ from datetime import date
 
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind
-from starstamp.model.method import Method
 from starstamp.model.service import ARGON
 from starstamp.reporting import fleet
-from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.db import Book
 
-from ..support.factories import make_cylinder, make_observation, make_readings
-from ..support.shop import DAY, SYSTEM, stock
+from ..support.factories import make_cylinder, make_observation
+from ..support.requests import requalify
+from ..support.shop import DAY, stock
 
 KEY = CylinderKey("NCI", "A4471")
-
-
-def requalify(book: Book, key: CylinderKey = KEY, **changes: object) -> None:
-    base: dict[str, object] = {
-        "key": key,
-        "day": DAY,
-        "technician_badge": "JT7",
-        "method": Method.VOLUMETRIC,
-        "system_code": SYSTEM,
-        "readings": make_readings(),
-    }
-    base.update(changes)
-    RequalificationService(book).perform(RequalificationRequest(**base))  # type: ignore[arg-type]
 
 
 def test_an_untested_fleet(shop_book: Book) -> None:
@@ -65,7 +51,7 @@ def test_due_within_a_window(shop_book: Book) -> None:
 
 def test_condemnations_are_counted_and_rated(shop_book: Book) -> None:
     other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.BULGE),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.BULGE),))
     standing = fleet.build(shop_book, "WELD1", DAY)
     assert standing.condemned_ever == 1
     assert standing.condemned_this_year == 1
@@ -75,7 +61,7 @@ def test_condemnations_are_counted_and_rated(shop_book: Book) -> None:
 
 def test_condemnations_from_an_earlier_year(shop_book: Book) -> None:
     other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
-    requalify(shop_book, other, observations=(make_observation(DefectKind.BULGE),))
+    requalify(shop_book, key=other, observations=(make_observation(DefectKind.BULGE),))
     standing = fleet.build(shop_book, "WELD1", date(2025, 3, 1))
     assert standing.condemned_ever == 1
     assert standing.condemned_this_year == 0
