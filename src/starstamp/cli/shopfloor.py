@@ -296,3 +296,50 @@ def show_technician(shop: ShopContext, badge: str, first: str | None, last: str 
             click.echo(f"busiest day {busiest[0].isoformat()}, {busiest[1]} cylinders")
         for label, count in workload.methods().items():
             click.echo(f"  {count} x {label}")
+
+
+@tech.command("renew")
+@click.argument("badge")
+@click.option("--until", default=None, help="the new end date, or leave it out for no end")
+@pass_shop
+def renew_technician(shop: ShopContext, badge: str, until: str | None) -> None:
+    """Move somebody's sign off out."""
+    with shop.open_for_write() as handle:
+        renewed = TechnicianRepository(handle.connection).renew(
+            badge, None if until is None else parse_day(until)
+        )
+    click.echo(f"{renewed.badge} signed off to {dash(renewed.qualified_until)}")
+
+
+@tech.command("sign-off")
+@click.argument("badge")
+@click.argument("method")
+@pass_shop
+def sign_off(shop: ShopContext, badge: str, method: str) -> None:
+    """Sign somebody off for one more method."""
+    with shop.open_for_write() as handle:
+        updated = TechnicianRepository(handle.connection).add_method(badge, Method.parse(method))
+    click.echo(
+        f"{updated.badge} now holds " + ", ".join(sorted(item.label for item in updated.methods))
+    )
+
+
+@tech.command("lapsing")
+@click.option("--within", default=60, show_default=True, help="days ahead to look")
+@click.option("--on", "day", default=None)
+@pass_shop
+def lapsing(shop: ShopContext, within: int, day: str | None) -> None:
+    """Sign offs that are about to run out, and any that already have."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        repository = TechnicianRepository(handle.connection)
+        soon = repository.lapsing_within(when, within)
+        gone = repository.lapsed_on(when)
+    if not soon and not gone:
+        click.echo("nobody is lapsing")
+        return
+    for item in gone:
+        click.echo(f"lapsed: {item} on {item.qualified_until}")
+    for item in soon:
+        left = (item.qualified_until - when).days if item.qualified_until else 0
+        click.echo(f"{item} lapses in {left} days")

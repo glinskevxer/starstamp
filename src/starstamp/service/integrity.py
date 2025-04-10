@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 
+from starstamp.errors import NotFoundError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.event import Outcome, RequalificationEvent
 from starstamp.rules.validity import required_instruments
@@ -22,6 +23,7 @@ from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
+from starstamp.store.facility import TechnicianRepository
 from starstamp.store.lots import LotRepository
 from starstamp.store.migrations import discover, schema_version
 from starstamp.store.notices import NoticeRepository
@@ -83,6 +85,7 @@ class IntegrityService:
         self.calibration = CalibrationRepository(book.connection)
         self.notices = NoticeRepository(book.connection)
         self.lots = LotRepository(book.connection)
+        self.technicians = TechnicianRepository(book.connection)
 
     def run(self, today: date) -> Report:
         findings: list[Finding] = []
@@ -96,6 +99,7 @@ class IntegrityService:
             findings.extend(self._status_against_history(cylinder, history))
             findings.extend(self._evidence(history))
             findings.extend(self._notices(cylinder.owner_code, history))
+            findings.extend(self._signed_off(history))
         findings.extend(self._settled_against_reversals())
         findings.extend(self._late_letters(today))
         findings.extend(self._undealt_with(today))
@@ -229,6 +233,39 @@ class IntegrityService:
             )
             for row in DisposalService(self.book).late(today)
         ]
+
+    def _signed_off(self, history: list[RequalificationEvent]) -> list[Finding]:
+        """Work recorded against a badge that was not signed off that day.
+
+        This is the check that reads the past rather than the present. A
+        technician whose sign off lapsed in March is fine today and every test
+        they did in April is not, and nothing else in the book would say so.
+        """
+        findings: list[Finding] = []
+        for event in history:
+            try:
+                technician = self.technicians.by_badge(event.technician_badge)
+            except NotFoundError:
+                findings.append(
+                    Finding(
+                        "sign off",
+                        Severity.WARNING,
+                        f"record {event.event_id}",
+                        f"{event.technician_badge} is not on the bench",
+                    )
+                )
+                continue
+            if not technician.may_perform(event.method, event.performed_on):
+                findings.append(
+                    Finding(
+                        "sign off",
+                        Severity.PROBLEM,
+                        f"record {event.event_id}",
+                        f"{technician.badge} was not signed off for {event.method.label} on "
+                        f"{event.performed_on.isoformat()}",
+                    )
+                )
+        return findings
 
     def _settled_against_reversals(self) -> list[Finding]:
         findings: list[Finding] = []

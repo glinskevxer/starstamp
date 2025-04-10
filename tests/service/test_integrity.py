@@ -93,3 +93,21 @@ def test_a_letter_past_its_deadline_is_a_problem(shop_book: Book) -> None:
     report = IntegrityService(shop_book).run(date(2024, 7, 20))
     assert report.problems
     assert "should have been written to by 2024-07-12" in report.problems[0].detail
+
+
+def test_a_test_recorded_by_somebody_who_had_lapsed(shop_book: Book) -> None:
+    from starstamp.store.facility import TechnicianRepository
+
+    requalify(shop_book)
+    TechnicianRepository(shop_book.connection).renew("JT7", date(2024, 1, 1))
+    report = IntegrityService(shop_book).run(DAY)
+    assert report.problems
+    assert "was not signed off for volumetric on 2024-06-12" in report.problems[0].detail
+
+
+def test_a_badge_that_is_not_on_the_bench_is_a_warning(shop_book: Book) -> None:
+    requalify(shop_book)
+    shop_book.connection.execute("DELETE FROM technician")
+    report = IntegrityService(shop_book).run(DAY)
+    assert report.problems == ()
+    assert "not on the bench" in report.findings[0].detail

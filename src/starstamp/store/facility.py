@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 
 from starstamp.errors import ConflictError
 from starstamp.model.facility import Facility, Technician, normalise_badge, normalise_rin
@@ -123,6 +124,36 @@ class TechnicianRepository(Repository):
         return [
             row_to_technician(row) for row in self._all("SELECT * FROM technician ORDER BY badge")
         ]
+
+    def renew(self, badge: str, qualified_until: date | None) -> Technician:
+        """Move somebody's sign off out, or take the end date off entirely."""
+        technician = self.by_badge(badge)
+        self.connection.execute(
+            "UPDATE technician SET qualified_until = ? WHERE badge = ?",
+            (optional_day_text(qualified_until), technician.badge),
+        )
+        return self.by_badge(badge)
+
+    def add_method(self, badge: str, method: Method) -> Technician:
+        """Sign somebody off for one more method."""
+        technician = self.by_badge(badge)
+        self.connection.execute(
+            "UPDATE technician SET methods = ? WHERE badge = ?",
+            (pack_methods(technician.methods | {method}), technician.badge),
+        )
+        return self.by_badge(badge)
+
+    def lapsing_within(self, day: date, days: int) -> list[Technician]:
+        """Sign offs that run out inside a window, soonest first."""
+        found = [
+            item
+            for item in self.all()
+            if item.qualified_until is not None and 0 <= (item.qualified_until - day).days <= days
+        ]
+        return sorted(found, key=lambda item: item.qualified_until or day)
+
+    def lapsed_on(self, day: date) -> list[Technician]:
+        return [item for item in self.all() if not item.qualified_on(day)]
 
     def qualified_for(self, method: Method) -> list[Technician]:
         return [item for item in self.all() if method in item.methods]

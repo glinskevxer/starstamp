@@ -106,3 +106,60 @@ def test_duplicate_badge(book: Book) -> None:
     repository.add(technician)
     with pytest.raises(ConflictError, match="already on the bench"):
         repository.add(technician)
+
+
+def test_renewing_a_sign_off(book: Book) -> None:
+    repository = TechnicianRepository(book.connection)
+    repository.add(
+        Technician(
+            badge="JT7",
+            name="Jesse Tovar",
+            methods=METHODS,
+            qualified_from=date(2022, 3, 1),
+            qualified_until=date(2024, 3, 1),
+        )
+    )
+    renewed = repository.renew("jt7", date(2027, 3, 1))
+    assert renewed.qualified_until == date(2027, 3, 1)
+    forever = repository.renew("JT7", None)
+    assert forever.qualified_until is None
+
+
+def test_signing_somebody_off_for_another_method(book: Book) -> None:
+    repository = TechnicianRepository(book.connection)
+    repository.add(
+        Technician(
+            badge="JT7",
+            name="Jesse Tovar",
+            methods=frozenset({Method.VOLUMETRIC}),
+            qualified_from=date(2022, 3, 1),
+        )
+    )
+    updated = repository.add_method("JT7", Method.ULTRASONIC)
+    assert updated.methods == frozenset({Method.VOLUMETRIC, Method.ULTRASONIC})
+    again = repository.add_method("JT7", Method.ULTRASONIC)
+    assert len(again.methods) == 2
+
+
+def test_who_is_lapsing(book: Book) -> None:
+    repository = TechnicianRepository(book.connection)
+    repository.add(
+        Technician(
+            badge="JT7",
+            name="Jesse",
+            methods=METHODS,
+            qualified_from=date(2022, 3, 1),
+            qualified_until=date(2024, 7, 1),
+        )
+    )
+    repository.add(
+        Technician(
+            badge="MR2",
+            name="Marisol",
+            methods=METHODS,
+            qualified_from=date(2022, 3, 1),
+            qualified_until=date(2024, 1, 1),
+        )
+    )
+    assert [item.badge for item in repository.lapsing_within(date(2024, 6, 12), 60)] == ["JT7"]
+    assert [item.badge for item in repository.lapsed_on(date(2024, 6, 12))] == ["MR2"]

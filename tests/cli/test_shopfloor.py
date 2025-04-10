@@ -141,3 +141,43 @@ def test_a_wider_tolerance_lets_it_through(shop: Invoke) -> None:
     shop("setting", "set", "check_tolerance_percent", "2", "--from", "2024-01-01")
     out = shop("rig", "check", "WJ-1", "40.0", "39.5", "--on", "2024-06-12").output
     assert "within tolerance" in out
+
+
+def test_renewing_and_signing_off(shop: Invoke) -> None:
+    shop(
+        "tech",
+        "add",
+        "jt7",
+        "Jesse Tovar",
+        "--methods",
+        "volumetric",
+        "--from",
+        "2022-03-01",
+        "--until",
+        "2024-03-01",
+    )
+    assert (
+        "signed off to 2027-03-01" in shop("tech", "renew", "jt7", "--until", "2027-03-01").output
+    )
+    out = shop("tech", "sign-off", "jt7", "ut").output
+    assert "ultrasonic, volumetric" in out
+
+
+def test_who_is_lapsing(shop: Invoke) -> None:
+    assert "nobody is lapsing" in shop("tech", "lapsing").output
+    shop(
+        "tech",
+        "add",
+        "jt7",
+        "Jesse Tovar",
+        "--methods",
+        "volumetric",
+        "--from",
+        "2022-03-01",
+        "--until",
+        "2024-07-01",
+    )
+    out = shop("--today", "2024-06-12", "tech", "lapsing", "--within", "60").output
+    assert "lapses in 19 days" in out
+    gone = shop("--today", "2024-08-12", "tech", "lapsing").output
+    assert "lapsed:" in gone
