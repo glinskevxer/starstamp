@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
@@ -15,6 +17,7 @@ from starstamp.reporting import (
     condemnation,
     fleet,
     forecast,
+    pack,
     rig,
     technician,
     throughput,
@@ -232,3 +235,18 @@ def close_report(shop: ShopContext, month: str | None) -> None:
     with shop.open() as handle:
         pack = close.build(handle, stamped, shop.today)
     click.echo(close.render(pack))
+
+
+@report.command("pack")
+@click.argument("directory", type=click.Path(file_okay=False, path_type=Path))
+@click.option("--from", "first", default=None, help="first day of the period")
+@click.option("--to", "last", default=None, help="last day of the period")
+@pass_shop
+def audit_pack(shop: ShopContext, directory: Path, first: str | None, last: str | None) -> None:
+    """Write an audit pack to a directory: a packet per cylinder and the sheets."""
+    window = resolve_window(shop.today, first=first, last=last)
+    with shop.open() as handle:
+        result = pack.write(handle, directory, window.first, window.last, shop.today)
+    click.echo(result.describe())
+    for name in result.incomplete:
+        click.echo(f"  incomplete: {name}")

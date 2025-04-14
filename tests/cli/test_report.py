@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from .conftest import DAY, Invoke
@@ -219,3 +221,21 @@ def test_the_pack_defaults_to_this_month(tested: Invoke) -> None:
     out = tested("--today", "2024-06-30", "report", "close").output
     assert "2024-06" in out
     assert "cylinders         1" in out
+
+
+def test_writing_an_audit_pack(tested: Invoke, tmp_path: Path) -> None:
+    target = tmp_path / "pack"
+    out = tested(
+        "--today",
+        "2024-07-01",
+        "report",
+        "pack",
+        str(target),
+        "--from",
+        "2024-06-01",
+        "--to",
+        "2024-06-30",
+    ).output
+    assert "files for 1 cylinders" in out
+    assert (target / "index.txt").exists()
+    assert (target / "packets" / "NCI-A4471.txt").exists()
