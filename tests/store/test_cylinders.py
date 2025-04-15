@@ -158,3 +158,56 @@ def test_a_wall_reading_has_to_be_a_measurement(
     cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
     with pytest.raises(ConflictError, match="positive measurement"):
         cylinders.record_wall(CylinderKey.of("NCI", "A4471"), date(2024, 4, 2), 0, "guess", None)
+
+
+def test_searching_by_owner_and_status(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    owners.add(OwnerAccount(code="FIRE7", name="Sanpete Fire", opened_on=date(2020, 1, 1)))
+    cylinders.add(a_cylinder("A1"), owners.id_of("WELD1"), RECORDED)
+    cylinders.add(a_cylinder("A2"), owners.id_of("FIRE7"), RECORDED)
+    cylinders.set_status(CylinderKey.of("NCI", "A2"), CylinderStatus.IN_SHOP)
+    assert len(cylinders.search(owner_code="weld1")) == 1
+    assert len(cylinders.search(status=CylinderStatus.IN_SHOP)) == 1
+    assert len(cylinders.search()) == 2
+
+
+def test_searching_by_specification_and_gas(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder("A1"), owners.id_of("WELD1"), RECORDED)
+    cylinders.add(
+        a_cylinder("A2", specification=parse_specification("DOT-3AL3000"), service=ARGON),
+        owners.id_of("WELD1"),
+        RECORDED,
+    )
+    assert [item.key.serial for item in cylinders.search(spec_code="3al")] == ["A2"]
+    assert [item.key.serial for item in cylinders.search(service_code="ar")] == ["A2"]
+
+
+def test_searching_by_when_it_was_made(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    from starstamp.model.dates import StampedMonth
+
+    cylinders.add(a_cylinder("A1"), owners.id_of("WELD1"), RECORDED)
+    cylinders.add(
+        a_cylinder("A2", manufactured=StampedMonth(2015, 4)), owners.id_of("WELD1"), RECORDED
+    )
+    before = cylinders.search(made_before=StampedMonth(2000, 1))
+    assert [item.key.serial for item in before] == ["A1"]
+    after = cylinders.search(made_after=StampedMonth(2000, 1))
+    assert [item.key.serial for item in after] == ["A2"]
+
+
+def test_searching_by_maker_and_limiting(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder("A1"), owners.id_of("WELD1"), RECORDED)
+    cylinders.add(a_cylinder("A2", symbol="PST"), owners.id_of("WELD1"), RECORDED)
+    assert len(cylinders.search(symbol="pst")) == 1
+    assert len(cylinders.search(limit=1)) == 1
+
+
+def test_a_search_that_matches_nothing(cylinders: CylinderRepository) -> None:
+    assert cylinders.search(owner_code="NOBODY") == []

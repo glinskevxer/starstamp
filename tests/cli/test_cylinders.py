@@ -245,3 +245,20 @@ def test_the_age_profile(stocked: Invoke) -> None:
 
 def test_the_age_profile_of_an_empty_book(shop: Invoke) -> None:
     assert "no cylinders" in shop("cylinder", "age").output
+
+
+def test_finding_cylinders(stocked: Invoke) -> None:
+    out = stocked("cylinder", "find", "--owner", "weld1").output
+    assert "NCI/A4471" in out
+    assert "1 cylinders" in out
+
+
+def test_finding_by_specification_and_age(stocked: Invoke) -> None:
+    assert "NCI/A4471" in stocked("cylinder", "find", "--spec", "3aa").output
+    assert "nothing matches" in stocked("cylinder", "find", "--spec", "3al").output
+    assert "NCI/A4471" in stocked("cylinder", "find", "--made-before", "2000-01").output
+    assert "nothing matches" in stocked("cylinder", "find", "--made-after", "2000-01").output
+
+
+def test_finding_by_a_status_that_is_not_one(stocked: Invoke) -> None:
+    stocked("cylinder", "find", "--status", "wobbly", expect=2)

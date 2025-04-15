@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.windows import parse_month
 from starstamp.errors import RuleViolationError, ValidationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.dates import StampedMonth
@@ -320,3 +321,65 @@ def age_profile(shop: ShopContext, owner: str | None) -> None:
     oldest = min(fleet, key=lambda item: (item.manufactured.year, item.manufactured.month))
     years = shop.today.year - oldest.manufactured.year
     click.echo(f"oldest is {oldest.key}, made {oldest.manufactured.long_form()}, {years} years")
+
+
+@cylinder.command("find")
+@click.option("--owner", default=None, help="one account")
+@click.option("--status", "status_text", default=None, help="one status")
+@click.option("--service", "service_code", default=None, help="one gas")
+@click.option("--spec", "spec_code", default=None, help="one specification code, 3AA")
+@click.option("--maker", default=None, help="one manufacturer symbol")
+@click.option("--made-before", default=None, help="made before this month, YYYY-MM")
+@click.option("--made-after", default=None, help="made after this month, YYYY-MM")
+@click.option("--limit", default=None, type=int, help="stop after this many")
+@pass_shop
+def find(
+    shop: ShopContext,
+    owner: str | None,
+    status_text: str | None,
+    service_code: str | None,
+    spec_code: str | None,
+    maker: str | None,
+    made_before: str | None,
+    made_after: str | None,
+    limit: int | None,
+) -> None:
+    """Find cylinders by whatever you happen to know about them."""
+    status = None
+    if status_text is not None:
+        try:
+            status = CylinderStatus(status_text)
+        except ValueError as exc:
+            known = ", ".join(item.value for item in CylinderStatus)
+            raise click.BadParameter(f"status is one of {known}") from exc
+    with shop.open() as handle:
+        found = CylinderRepository(handle.connection).search(
+            owner_code=owner,
+            status=status,
+            service_code=service_code,
+            spec_code=spec_code,
+            symbol=maker,
+            made_before=None if made_before is None else parse_month(made_before),
+            made_after=None if made_after is None else parse_month(made_after),
+            limit=limit,
+        )
+    if not found:
+        click.echo("nothing matches")
+        return
+    click.echo(
+        render_table(
+            ["cylinder", "spec", "gas", "made", "owner", "status"],
+            [
+                [
+                    str(item.key),
+                    str(item.specification),
+                    item.service.code,
+                    item.manufactured.long_form(),
+                    item.owner_code,
+                    item.status.value,
+                ]
+                for item in found
+            ],
+        )
+    )
+    click.echo(f"{len(found)} cylinders")

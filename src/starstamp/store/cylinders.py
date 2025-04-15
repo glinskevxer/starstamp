@@ -234,6 +234,55 @@ class CylinderRepository(Repository):
         )
         return self.by_key(key)
 
+    def search(
+        self,
+        *,
+        owner_code: str | None = None,
+        status: CylinderStatus | None = None,
+        service_code: str | None = None,
+        spec_code: str | None = None,
+        made_before: StampedMonth | None = None,
+        made_after: StampedMonth | None = None,
+        symbol: str | None = None,
+        limit: int | None = None,
+    ) -> list[Cylinder]:
+        """Find cylinders by whatever the counter happens to know.
+
+        The filters are built as clauses rather than as one query per
+        combination, because the combinations are what people actually ask
+        for: this account's aluminium cylinders made before 1990, in service.
+        """
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if owner_code is not None:
+            clauses.append("o.code = ?")
+            parameters.append(owner_code.upper())
+        if status is not None:
+            clauses.append("c.status = ?")
+            parameters.append(status.value)
+        if service_code is not None:
+            clauses.append("c.service_code = ?")
+            parameters.append(service_code.upper())
+        if spec_code is not None:
+            clauses.append("c.spec_code = ?")
+            parameters.append(spec_code.upper())
+        if symbol is not None:
+            clauses.append("c.manufacturer_symbol = ?")
+            parameters.append(symbol.upper())
+        if made_before is not None:
+            clauses.append("(c.dom_year * 12 + c.dom_month) < ?")
+            parameters.append(made_before.year * 12 + made_before.month)
+        if made_after is not None:
+            clauses.append("(c.dom_year * 12 + c.dom_month) > ?")
+            parameters.append(made_after.year * 12 + made_after.month)
+
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        tail = " ORDER BY c.manufacturer_symbol, c.serial"
+        if limit is not None:
+            tail = f"{tail} LIMIT {int(limit)}"
+        rows = self._all(f"{self._SELECT}{where}{tail}", tuple(parameters))
+        return [row_to_cylinder(row, as_text(row["owner_code"])) for row in rows]
+
     def by_key_from(self, text: str) -> CylinderKey:
         """Read a SYMBOL/SERIAL string back into a key this book knows."""
         key = CylinderKey.parse(text)
