@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
@@ -13,6 +15,7 @@ from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
 from starstamp.model.ultrasonic import Position, Reading, Scan
 from starstamp.model.units import Expansion, Pressure
+from starstamp.service.batch import BatchService
 from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.events import EventRepository
 from starstamp.text.table import dash, render_pairs, render_table
@@ -271,3 +274,39 @@ def show_event(shop: ShopContext, event_id: int) -> None:
         click.echo(f"  weighing: {weighing.describe()}")
     for reason in event.reasons:
         click.echo(f"  {reason}")
+
+
+@requal.command("batch")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--tech", required=True, help="the badge of whoever did the work")
+@click.option("--system", "system_code", required=True, help="the test system used")
+@click.option("--on", "day", default=None, help="the day of the sheet")
+@click.option("--method", "method_text", default="volumetric", show_default=True)
+@pass_shop
+def batch(
+    shop: ShopContext,
+    path: Path,
+    tech: str,
+    system_code: str,
+    day: str | None,
+    method_text: str,
+) -> None:
+    """Enter a day's bench sheet in one go."""
+    text = path.read_text()
+    when = resolve_day(day, shop)
+    with shop.open_for_write() as handle:
+        result = BatchService(handle).run(
+            text, when, tech, system_code, method=Method.parse(method_text)
+        )
+    click.echo(result.describe())
+    for item in result.results:
+        click.echo(f"  {item.summary()}")
+
+
+@requal.command("sheet")
+@click.option("--rows", default=1, show_default=True, help="how many example rows")
+def sheet(rows: int) -> None:
+    """Print a blank bench sheet."""
+    click.echo("cylinder,applied,total,permanent,hold,defects")
+    for index in range(max(rows, 0)):
+        click.echo(f"NCI/A{4471 + index},3358,110.0,2.0,30,")

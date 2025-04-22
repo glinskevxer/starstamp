@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from starstamp.cli.requal import build_readings, parse_defect
@@ -108,3 +110,52 @@ def test_the_weighing_builds() -> None:
     assert exam.tare_now_hundredths_lb == 8470
     assert not exam.fuse_plugs_sound
     assert not exam.cap_sound
+
+
+def test_the_sheet_template(shop: Invoke) -> None:
+    out = shop("requal", "sheet", "--rows", "0").output
+    assert out.strip() == "cylinder,applied,total,permanent,hold,defects"
+
+
+def test_a_batch_through_the_command_line(running_shop: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "sheet.csv"
+    path.write_text("cylinder,applied,total,permanent,hold,defects\nNCI/A4471,3358,110.0,2.0,30,\n")
+    out = running_shop(
+        "requal",
+        "batch",
+        str(path),
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        "2024-06-12",
+    ).output
+    assert "1 recorded, 1 passed" in out
+    assert "volumetric pass" in out
+
+
+def test_a_batch_with_a_bad_row(running_shop: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "sheet.csv"
+    path.write_text(
+        "cylinder,applied,total,permanent\nNCI/A4471,3358,110.0,2.0\nNOPE/X1,3358,110.0,2.0\n"
+    )
+    out = running_shop(
+        "requal",
+        "batch",
+        str(path),
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        "2024-06-12",
+    ).output
+    assert "1 rows left out" in out
+    assert "no cylinder NOPE/X1" in out
+
+
+def test_a_batch_with_the_wrong_columns(running_shop: Invoke, tmp_path: Path) -> None:
+    path = tmp_path / "sheet.csv"
+    path.write_text("cylinder\nNCI/A4471\n")
+    running_shop("requal", "batch", str(path), "--tech", "jt7", "--system", "WJ-1", expect=1)
