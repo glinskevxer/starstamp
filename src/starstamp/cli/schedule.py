@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_lines, echo_table
 from starstamp.service.schedule import ScheduleService
 from starstamp.store.bookings import BookingRepository
 from starstamp.text.table import dash, render_table
@@ -44,24 +45,20 @@ def day_view(shop: ShopContext, day: str | None) -> None:
         promised = service.bookings.on_day(when)
     click.echo(standing.describe())
     click.echo(f"rigs in calibration: {', '.join(rigs) if rigs else 'none'}")
-    if not promised:
-        click.echo("nothing promised")
-        return
-    click.echo(
-        render_table(
-            ["id", "owner", "cylinders", "state", "lot"],
+    echo_table(
+        ["id", "owner", "cylinders", "state", "lot"],
+        [
             [
-                [
-                    str(item.booking_id),
-                    item.owner_code,
-                    str(item.cylinders),
-                    item.state.value,
-                    dash(item.lot_number),
-                ]
-                for item in promised
-            ],
-            right=(2,),
-        )
+                str(item.booking_id),
+                item.owner_code,
+                str(item.cylinders),
+                item.state.value,
+                dash(item.lot_number),
+            ]
+            for item in promised
+        ],
+        right=(2,),
+        empty="nothing promised",
     )
 
 
@@ -103,11 +100,10 @@ def offer(shop: ShopContext, cylinders: int, day: str | None, within: int) -> No
     when = resolve_day(day, shop)
     with shop.open() as handle:
         found = ScheduleService(handle).offers(when, within, cylinders)
-    if not found:
-        click.echo(f"no day in the next {within} could take {cylinders}")
-        return
-    for item in found[:5]:
-        click.echo(item.describe())
+    echo_lines(
+        (item.describe() for item in found[:5]),
+        empty=f"no day in the next {within} could take {cylinders}",
+    )
 
 
 @book.command("arrive")
@@ -140,8 +136,7 @@ def missed(shop: ShopContext, day: str | None) -> None:
     when = resolve_day(day, shop)
     with shop.open() as handle:
         found = BookingRepository(handle.connection).missed(when)
-    if not found:
-        click.echo("nothing missed")
-        return
-    for item in found:
-        click.echo(f"{item.summary()}, {abs(item.days_out(when))} days ago")
+    echo_lines(
+        (f"{item.summary()}, {abs(item.days_out(when))} days ago" for item in found),
+        empty="nothing missed",
+    )

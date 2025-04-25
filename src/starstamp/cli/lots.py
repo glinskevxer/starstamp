@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_table
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.lot import LotStatus
 from starstamp.model.settings import STORAGE_FREE_DAYS
@@ -98,26 +99,22 @@ def open_lots(shop: ShopContext) -> None:
     """Every lot still in the shop."""
     with shop.open() as handle:
         standings = ReceivingService(handle).open_standing()
-    if not standings:
-        click.echo("nothing in the shop")
-        return
-    click.echo(
-        render_table(
-            ["lot", "owner", "received", "promised", "status", "settled", "days"],
+    echo_table(
+        ["lot", "owner", "received", "promised", "status", "settled", "days"],
+        [
             [
-                [
-                    standing.lot.number,
-                    standing.lot.owner_code,
-                    standing.lot.received_on.isoformat(),
-                    dash(standing.lot.promised_on),
-                    standing.lot.status.value,
-                    f"{standing.settled}/{len(standing.lines)}",
-                    str(standing.lot.days_in_shop(shop.today)),
-                ]
-                for standing in standings
-            ],
-            right=(6,),
-        )
+                standing.lot.number,
+                standing.lot.owner_code,
+                standing.lot.received_on.isoformat(),
+                dash(standing.lot.promised_on),
+                standing.lot.status.value,
+                f"{standing.settled}/{len(standing.lines)}",
+                str(standing.lot.days_in_shop(shop.today)),
+            ]
+            for standing in standings
+        ],
+        right=(6,),
+        empty="nothing in the shop",
     )
     late = [standing for standing in standings if standing.lot.is_late(shop.today)]
     for standing in late:
@@ -172,24 +169,20 @@ def lot_history(shop: ShopContext, owner: str) -> None:
     """Every lot an account has sent in."""
     with shop.open() as handle:
         found = LotRepository(handle.connection).for_owner(owner)
-    if not found:
-        click.echo(f"no lots for {owner.upper()}")
-        return
-    click.echo(
-        render_table(
-            ["lot", "received", "returned", "status", "days"],
+    echo_table(
+        ["lot", "received", "returned", "status", "days"],
+        [
             [
-                [
-                    item.number,
-                    item.received_on.isoformat(),
-                    dash(item.returned_on),
-                    item.status.value,
-                    str(item.days_in_shop(shop.today)),
-                ]
-                for item in found
-            ],
-            right=(4,),
-        )
+                item.number,
+                item.received_on.isoformat(),
+                dash(item.returned_on),
+                item.status.value,
+                str(item.days_in_shop(shop.today)),
+            ]
+            for item in found
+        ],
+        right=(4,),
+        empty=f"no lots for {owner.upper()}",
     )
     finished = [item for item in found if item.status is LotStatus.RETURNED]
     if finished:
@@ -209,24 +202,20 @@ def storage(shop: ShopContext, day: str | None, owner: str | None) -> None:
         found = repository.for_owner(owner) if owner else repository.open_lots()
         free_days = SettingRepository(handle.connection).integer(STORAGE_FREE_DAYS, when)
         charging = chargeable(found, when, free_days)
-    if not charging:
-        click.echo(f"nothing has been here longer than {free_days} days")
-        return
-    click.echo(
-        render_table(
-            ["lot", "owner", "received", "held", "chargeable"],
+    echo_table(
+        ["lot", "owner", "received", "held", "chargeable"],
+        [
             [
-                [
-                    item.lot_number,
-                    item.owner_code,
-                    item.received_on.isoformat(),
-                    str(item.days_held),
-                    str(item.chargeable_days),
-                ]
-                for item in charging
-            ],
-            right=(3, 4),
-        )
+                item.lot_number,
+                item.owner_code,
+                item.received_on.isoformat(),
+                str(item.days_held),
+                str(item.chargeable_days),
+            ]
+            for item in charging
+        ],
+        right=(3, 4),
+        empty=f"nothing has been here longer than {free_days} days",
     )
 
 
@@ -247,24 +236,20 @@ def uncollected(shop: ShopContext, day: str | None, write: bool) -> None:
         return
     with shop.open() as handle:
         found = AbandonedService(handle).left_behind(when)
-    if not found:
-        click.echo("nothing is waiting to be collected")
-        return
-    click.echo(
-        render_table(
-            ["lot", "owner", "ready", "standing", "next step"],
+    echo_table(
+        ["lot", "owner", "ready", "standing", "next step"],
+        [
             [
-                [
-                    item.lot.number,
-                    item.lot.owner_code,
-                    str(item.standing.days_ready),
-                    item.standing.standing.value,
-                    dash(item.standing.next_step_on()),
-                ]
-                for item in found
-            ],
-            right=(2,),
-        )
+                item.lot.number,
+                item.lot.owner_code,
+                str(item.standing.days_ready),
+                item.standing.standing.value,
+                dash(item.standing.next_step_on()),
+            ]
+            for item in found
+        ],
+        right=(2,),
+        empty="nothing is waiting to be collected",
     )
     for item in found:
         if item.standing.standing.may_be_disposed_of:

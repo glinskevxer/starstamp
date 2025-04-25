@@ -5,11 +5,12 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_lines, echo_table
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.disposal import DisposalMethod
 from starstamp.service.disposal import DisposalService
 from starstamp.store.disposals import DisposalRepository
-from starstamp.text.table import dash, render_table
+from starstamp.text.table import dash
 
 
 @click.group()
@@ -64,11 +65,7 @@ def outstanding(shop: ShopContext, day: str | None, late_only: bool) -> None:
     with shop.open() as handle:
         service = DisposalService(handle)
         rows = service.late(when) if late_only else service.outstanding(when)
-    if not rows:
-        click.echo("nothing waiting")
-        return
-    for row in rows:
-        click.echo(row.describe())
+    echo_lines((row.describe() for row in rows), empty="nothing waiting")
 
 
 @scrap.command("log")
@@ -81,24 +78,20 @@ def log(shop: ShopContext, first: str, last: str) -> None:
 
     with shop.open() as handle:
         found = DisposalRepository(handle.connection).between(parse_day(first), parse_day(last))
-    if not found:
-        click.echo("nothing in that window")
-        return
-    click.echo(
-        render_table(
-            ["date", "cylinder", "method", "tech", "witness", "ticket", "days"],
+    echo_table(
+        ["date", "cylinder", "method", "tech", "witness", "ticket", "days"],
+        [
             [
-                [
-                    item.performed_on.isoformat(),
-                    item.cylinder_key,
-                    item.method.label,
-                    item.technician_badge,
-                    dash(item.witness_badge),
-                    dash(item.scrap_ticket),
-                    str(item.days_taken),
-                ]
-                for item in found
-            ],
-            right=(6,),
-        )
+                item.performed_on.isoformat(),
+                item.cylinder_key,
+                item.method.label,
+                item.technician_badge,
+                dash(item.witness_badge),
+                dash(item.scrap_ticket),
+                str(item.days_taken),
+            ]
+            for item in found
+        ],
+        right=(6,),
+        empty="nothing in that window",
     )

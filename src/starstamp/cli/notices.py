@@ -5,9 +5,10 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_lines, echo_table
 from starstamp.service.notices import NoticeService
 from starstamp.store.notices import NoticeRepository
-from starstamp.text.table import dash, render_table
+from starstamp.text.table import dash
 
 
 @click.group()
@@ -50,25 +51,21 @@ def list_notices(shop: ShopContext, owner: str | None, unsent: bool) -> None:
             found = repository.for_owner(owner)
         elif not unsent:
             found = repository.unsent()
-    if not found:
-        click.echo("no notices")
-        return
-    click.echo(
-        render_table(
-            ["id", "owner", "cylinder", "kind", "raised", "sent", "due"],
+    echo_table(
+        ["id", "owner", "cylinder", "kind", "raised", "sent", "due"],
+        [
             [
-                [
-                    str(item.notice_id),
-                    item.owner_code,
-                    item.cylinder_key,
-                    item.kind.label,
-                    item.raised_on.isoformat(),
-                    dash(item.sent_on),
-                    dash(item.due_by()),
-                ]
-                for item in found
-            ],
-        )
+                str(item.notice_id),
+                item.owner_code,
+                item.cylinder_key,
+                item.kind.label,
+                item.raised_on.isoformat(),
+                dash(item.sent_on),
+                dash(item.due_by()),
+            ]
+            for item in found
+        ],
+        empty="no notices",
     )
 
 
@@ -106,8 +103,4 @@ def late(shop: ShopContext, day: str | None) -> None:
     when = resolve_day(day, shop)
     with shop.open() as handle:
         found = NoticeService(handle).overdue_letters(when)
-    if not found:
-        click.echo("nothing late")
-        return
-    for item in found:
-        click.echo(f"{item.summary()}, due {item.due_by()}")
+    echo_lines((f"{item.summary()}, due {item.due_by()}" for item in found), empty="nothing late")
