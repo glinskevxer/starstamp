@@ -21,6 +21,7 @@ from starstamp.reporting import (
     rig,
     technician,
     throughput,
+    unbilled,
 )
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
@@ -250,3 +251,14 @@ def audit_pack(shop: ShopContext, directory: Path, first: str | None, last: str 
     click.echo(result.describe())
     for name in result.incomplete:
         click.echo(f"  incomplete: {name}")
+
+
+@report.command("unbilled")
+@click.option("--on", "day", default=None, help="the day to count up to")
+@pass_shop
+def unbilled_report(shop: ShopContext, day: str | None) -> None:
+    """Work the shop has done and not charged for."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        found = unbilled.build(handle, when)
+    click.echo(unbilled.render(found))

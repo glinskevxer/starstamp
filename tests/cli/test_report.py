@@ -239,3 +239,11 @@ def test_writing_an_audit_pack(tested: Invoke, tmp_path: Path) -> None:
     assert "files for 1 cylinders" in out
     assert (target / "index.txt").exists()
     assert (target / "packets" / "NCI-A4471.txt").exists()
+
+
+def test_the_unbilled_report(tested: Invoke) -> None:
+    tested("price", "set", "REQUAL_WJ", "14.50", "--from", "2023-01-01")
+    out = tested("--today", "2024-07-01", "report", "unbilled").output
+    assert "1 records worth $14.50 unbilled" in out
+    tested("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06")
+    assert "has been billed" in tested("--today", "2024-07-01", "report", "unbilled").output
