@@ -27,6 +27,7 @@ from starstamp.store.repository import (
     day_text,
     optional_day_text,
 )
+from starstamp.store.transfers import TransferRepository
 
 
 def row_to_cylinder(row: sqlite3.Row, owner_code: str) -> Cylinder:
@@ -157,13 +158,31 @@ class CylinderRepository(Repository):
         )
         return moved
 
-    def transfer(self, key: CylinderKey, owner_id: int) -> Cylinder:
+    def transfer(
+        self,
+        key: CylinderKey,
+        owner_id: int,
+        moved_on: date | None = None,
+        note: str | None = None,
+    ) -> Cylinder:
+        """Move a cylinder to another account, keeping the old owner on record."""
         cylinder = self.by_key(key)
         if cylinder.status.is_terminal:
             raise ConflictError(f"{key} is {cylinder.status.value} and cannot change hands")
+        row = self._one(
+            "SELECT owner_id FROM cylinder WHERE manufacturer_symbol = ? AND serial = ?",
+            (key.manufacturer_symbol, key.serial),
+            f"no cylinder {key}",
+        )
+        previous = as_int(row["owner_id"])
+        if previous == owner_id:
+            raise ConflictError(f"{key} already belongs to {cylinder.owner_code}")
         self.connection.execute(
             "UPDATE cylinder SET owner_id = ? WHERE manufacturer_symbol = ? AND serial = ?",
             (owner_id, key.manufacturer_symbol, key.serial),
+        )
+        TransferRepository(self.connection).add(
+            self.id_of(key), previous, owner_id, moved_on or date.today(), note
         )
         return self.by_key(key)
 

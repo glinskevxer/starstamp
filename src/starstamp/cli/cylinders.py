@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_lines
 from starstamp.cli.windows import parse_month
 from starstamp.errors import RuleViolationError, ValidationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
@@ -21,6 +22,7 @@ from starstamp.rules.method_matrix import permitted_methods, required_test_press
 from starstamp.service.imports import ImportService
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.owners import OwnerRepository
+from starstamp.store.transfers import TransferRepository
 from starstamp.text.table import dash, render_pairs, render_table
 
 
@@ -174,14 +176,31 @@ def wall(
 @cylinder.command("transfer")
 @click.argument("key")
 @click.argument("owner")
+@click.option("--on", "day", default=None, help="the day it changed hands")
+@click.option("--note", default=None, help="why, or what paperwork covers it")
 @pass_shop
-def transfer(shop: ShopContext, key: str, owner: str) -> None:
+def transfer(shop: ShopContext, key: str, owner: str, day: str | None, note: str | None) -> None:
     """Move a cylinder to another account."""
     wanted = CylinderKey.parse(key)
     with shop.open_for_write() as handle:
         owner_id = OwnerRepository(handle.connection).id_of(owner)
-        moved = CylinderRepository(handle.connection).transfer(wanted, owner_id)
+        moved = CylinderRepository(handle.connection).transfer(
+            wanted, owner_id, resolve_day(day, shop), note
+        )
     click.echo(f"{moved.key} now belongs to {moved.owner_code}")
+
+
+@cylinder.command("owners")
+@click.argument("key")
+@pass_shop
+def owners_history(shop: ShopContext, key: str) -> None:
+    """Who has owned a cylinder."""
+    wanted = CylinderKey.parse(key)
+    with shop.open() as handle:
+        current = CylinderRepository(handle.connection).by_key(wanted)
+        moves = TransferRepository(handle.connection).for_cylinder(wanted)
+    click.echo(f"{wanted} belongs to {current.owner_code}")
+    echo_lines((item.summary() for item in moves), empty="it has never changed hands here")
 
 
 @cylinder.command("status")

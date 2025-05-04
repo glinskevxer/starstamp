@@ -262,3 +262,26 @@ def test_finding_by_specification_and_age(stocked: Invoke) -> None:
 
 def test_finding_by_a_status_that_is_not_one(stocked: Invoke) -> None:
     stocked("cylinder", "find", "--status", "wobbly", expect=2)
+
+
+def test_the_ownership_history(stocked: Invoke) -> None:
+    assert "never changed hands" in stocked("cylinder", "owners", "NCI/A4471").output
+    stocked("account", "add", "fire7", "Sanpete Fire", "--opened", "2020-01-01")
+    stocked(
+        "cylinder",
+        "transfer",
+        "NCI/A4471",
+        "fire7",
+        "--on",
+        "2024-06-20",
+        "--note",
+        "sold with the business",
+    )
+    out = stocked("cylinder", "owners", "NCI/A4471").output
+    assert "belongs to FIRE7" in out
+    assert "WELD1 to FIRE7" in out
+    assert "sold with the business" in out
+
+
+def test_transferring_to_the_same_account(stocked: Invoke) -> None:
+    stocked("cylinder", "transfer", "NCI/A4471", "weld1", expect=4)
