@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_table
 from starstamp.cli.windows import parse_month
 from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.cylinder import CylinderKey
@@ -25,6 +26,7 @@ from starstamp.reporting import (
 )
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
+from starstamp.store.transfers import TransferRepository
 from starstamp.text.table import render_table
 
 
@@ -262,3 +264,29 @@ def unbilled_report(shop: ShopContext, day: str | None) -> None:
     with shop.open() as handle:
         found = unbilled.build(handle, when)
     click.echo(unbilled.render(found))
+
+
+@report.command("ownership")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def ownership_report(shop: ShopContext, first: str | None, last: str | None) -> None:
+    """Cylinders that changed hands in a window."""
+    window = resolve_window(shop.today, first=first, last=last)
+    with shop.open() as handle:
+        moves = TransferRepository(handle.connection).between(window.first, window.last)
+    click.echo(str(window))
+    echo_table(
+        ["date", "cylinder", "from", "to", "note"],
+        [
+            [
+                item.moved_on.isoformat(),
+                item.cylinder_key,
+                item.from_owner or "-",
+                item.to_owner,
+                item.note or "-",
+            ]
+            for item in moves
+        ],
+        empty="nothing changed hands",
+    )

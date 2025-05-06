@@ -247,3 +247,16 @@ def test_the_unbilled_report(tested: Invoke) -> None:
     assert "1 records worth $14.50 unbilled" in out
     tested("--today", "2024-07-01", "invoice", "raise", "weld1", "--month", "2024-06")
     assert "has been billed" in tested("--today", "2024-07-01", "report", "unbilled").output
+
+
+def test_the_ownership_report(tested: Invoke) -> None:
+    assert (
+        "nothing changed hands"
+        in tested("report", "ownership", "--from", "2024-06-01", "--to", "2024-06-30").output
+    )
+    tested("account", "add", "fire7", "Sanpete Fire", "--opened", "2020-01-01")
+    tested("cylinder", "transfer", "NCI/A4471", "fire7", "--on", "2024-06-20")
+    out = tested("report", "ownership", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "NCI/A4471" in out
+    assert "WELD1" in out
+    assert "FIRE7" in out

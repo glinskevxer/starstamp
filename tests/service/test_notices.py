@@ -96,3 +96,28 @@ def test_the_drafted_summary(shop_book: Book) -> None:
     drafted = NoticeService(shop_book).draft_condemnations(date(2024, 6, 13))
     assert "1 notices drafted" in drafted.describe()
     assert "NCI/A4471 condemnation" in drafted.describe()
+
+
+def test_the_letter_goes_to_whoever_owned_it_at_the_time(shop_book: Book) -> None:
+    from datetime import date
+
+    from starstamp.model.owner import OwnerAccount
+    from starstamp.store.cylinders import CylinderRepository
+    from starstamp.store.owners import OwnerRepository
+
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
+    owners = OwnerRepository(shop_book.connection)
+    owners.add(OwnerAccount(code="FIRE7", name="Sanpete Fire", opened_on=date(2020, 1, 1)))
+    shop_book.connection.execute("UPDATE cylinder SET status = 'in_service'")
+    CylinderRepository(shop_book.connection).transfer(KEY, owners.id_of("FIRE7"), date(2024, 6, 25))
+    shop_book.connection.execute("UPDATE cylinder SET status = 'condemned'")
+
+    drafted = NoticeService(shop_book).draft_condemnations(date(2024, 6, 30))
+    assert drafted.count == 1
+    assert drafted.notices[0].owner_code == "WELD1"
+
+
+def test_a_cylinder_that_never_moved_writes_to_its_owner(shop_book: Book) -> None:
+    requalify(shop_book, observations=(make_observation(DefectKind.BULGE),))
+    drafted = NoticeService(shop_book).draft_condemnations(date(2024, 6, 13))
+    assert drafted.notices[0].owner_code == "WELD1"

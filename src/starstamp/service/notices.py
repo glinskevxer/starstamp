@@ -20,6 +20,7 @@ from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
 from starstamp.store.notices import NoticeRepository
 from starstamp.store.owners import OwnerRepository
+from starstamp.store.transfers import TransferRepository
 
 
 def condemnation_body(cylinder: Cylinder, event: RequalificationEvent) -> str:
@@ -78,6 +79,17 @@ class NoticeService:
         self.cylinders = CylinderRepository(book.connection)
         self.owners = OwnerRepository(book.connection)
         self.fill = FillService(book)
+        self.transfers = TransferRepository(book.connection)
+
+    def owner_at(self, cylinder: Cylinder, day: date) -> str:
+        """Whoever owned the cylinder on a day, which may not be who owns it now.
+
+        A cylinder condemned in March and sold in April is the new owner's
+        problem and the old owner's letter. Writing to the account on the
+        cylinder today would send the condemnation to somebody who never had
+        it tested.
+        """
+        return self.transfers.owner_on(cylinder.key, day, cylinder.owner_code)
 
     def draft_condemnations(self, day: date) -> Drafted:
         """One letter for every standing condemnation nobody has written about."""
@@ -88,8 +100,9 @@ class NoticeService:
                     continue
                 if self.notices.for_event(event.event_id):
                     continue
+                owner_code = self.owner_at(cylinder, event.performed_on)
                 notice = Notice(
-                    owner_code=cylinder.owner_code,
+                    owner_code=owner_code,
                     cylinder_key=str(cylinder.key),
                     kind=NoticeKind.CONDEMNATION,
                     raised_on=day,
@@ -99,7 +112,7 @@ class NoticeService:
                 drafted.append(
                     self.notices.add(
                         notice,
-                        self.owners.id_of(cylinder.owner_code),
+                        self.owners.id_of(owner_code),
                         self.cylinders.id_of(cylinder.key),
                     )
                 )
