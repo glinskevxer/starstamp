@@ -101,3 +101,28 @@ def test_a_certificate_that_is_not_on_file(tested: Invoke) -> None:
         "restated",
         expect=3,
     )
+
+
+def test_correcting_a_record(tested: Invoke) -> None:
+    out = tested(
+        "restate",
+        "correct",
+        "1",
+        "--reason",
+        "typed from the wrong line",
+        "--applied",
+        "3358",
+        "--total",
+        "112.0",
+        "--permanent",
+        "2.0",
+    ).output
+    assert "reversed and rewritten" in out
+    assert "total 110.0 cc to 112.0 cc" in out
+    history = tested("requal", "history", "NCI/A4471", "--all").output
+    assert "reversed" in history
+    assert "replacement" in history
+
+
+def test_a_correction_that_changes_nothing(tested: Invoke) -> None:
+    tested("restate", "correct", "1", "--reason", "none", "--tech", "jt7", expect=4)

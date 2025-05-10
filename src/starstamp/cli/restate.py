@@ -11,7 +11,9 @@ import click
 from starstamp.cli.context import ShopContext, pass_shop
 from starstamp.model.calibration import InstrumentKind, normalise_system_code
 from starstamp.model.dates import parse_day
-from starstamp.service.restate import RestatementService
+from starstamp.model.testrecord import PressureReadings
+from starstamp.model.units import Expansion, Pressure
+from starstamp.service.restate import CorrectionService, RestatementService
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.events import EventRepository
 from starstamp.text.table import render_table
@@ -106,3 +108,44 @@ def window(shop: ShopContext, system_code: str, first: str, last: str) -> None:
             ],
         )
     )
+
+
+@restate.command("correct")
+@click.argument("event_id", type=int)
+@click.option("--reason", required=True, help="what was written down wrong")
+@click.option("--applied", default=None, help="the corrected pressure, psig")
+@click.option("--total", default=None, help="the corrected total expansion")
+@click.option("--permanent", default=None, help="the corrected permanent expansion")
+@click.option("--hold", default=30, show_default=True, help="hold time in seconds")
+@click.option("--tech", default=None, help="the badge it should have been against")
+@click.option("--system", "system_code", default=None, help="the rig it should have been")
+@pass_shop
+def correct(
+    shop: ShopContext,
+    event_id: int,
+    reason: str,
+    applied: str | None,
+    total: str | None,
+    permanent: str | None,
+    hold: int,
+    tech: str | None,
+    system_code: str | None,
+) -> None:
+    """Reverse a record and rewrite it with the numbers it should have had."""
+    readings = None
+    if applied is not None:
+        readings = PressureReadings(
+            applied=Pressure.parse(applied),
+            hold_seconds=hold,
+            total_expansion=None if total is None else Expansion.parse(total),
+            permanent_expansion=None if permanent is None else Expansion.parse(permanent),
+        )
+    with shop.open_for_write() as handle:
+        corrected = CorrectionService(handle).correct(
+            event_id,
+            reason,
+            readings=readings,
+            technician_badge=tech,
+            system_code=system_code,
+        )
+    click.echo(corrected.describe())

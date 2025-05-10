@@ -20,10 +20,12 @@ from datetime import date, timedelta
 from starstamp.errors import ConflictError, ValidationError
 from starstamp.model.calibration import Certificate
 from starstamp.model.event import EventState, Outcome, RequalificationEvent
+from starstamp.model.testrecord import PressureReadings
 from starstamp.store.calibration import CalibrationRepository
 from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.events import EventRepository
+from starstamp.store.facility import TechnicianRepository
 
 
 @dataclass(frozen=True)
@@ -137,3 +139,93 @@ class RestatementService:
             reversed_ids=tuple(reversed_ids),
             replacements=tuple(replacements),
         )
+
+
+@dataclass(frozen=True)
+class Correction:
+    """A record pulled and rewritten, with what changed."""
+
+    reversed_id: int
+    replacement: RequalificationEvent
+    changed: tuple[str, ...]
+
+    def describe(self) -> str:
+        line = f"record {self.reversed_id} reversed and rewritten as {self.replacement.event_id}"
+        if self.changed:
+            line = f"{line}: " + ", ".join(self.changed)
+        return line
+
+
+class CorrectionService:
+    """Fixing a record that was written down wrong.
+
+    A typed reading is not a restatement: nothing about the rig changed, the
+    shop simply wrote the wrong number. It still cannot be edited, because a
+    record of test that can change is not evidence, so a correction is the
+    same reversal and replacement a restatement uses, with the corrected
+    readings and a note saying what was altered.
+    """
+
+    def __init__(self, book: Book) -> None:
+        self.book = book
+        self.events = EventRepository(book.connection)
+        self.cylinders = CylinderRepository(book.connection)
+        self.technicians = TechnicianRepository(book.connection)
+
+    def correct(
+        self,
+        event_id: int,
+        reason: str,
+        *,
+        readings: PressureReadings | None = None,
+        technician_badge: str | None = None,
+        system_code: str | None = None,
+    ) -> Correction:
+        event = self.events.require_standing(event_id)
+        if readings is None and technician_badge is None and system_code is None:
+            raise ValidationError("a correction has to change something")
+        if technician_badge is not None:
+            technician_badge = self.technicians.by_badge(technician_badge).badge
+
+        changed: list[str] = []
+        if readings is not None and event.readings is not None:
+            if readings.applied != event.readings.applied:
+                changed.append(f"pressure {event.readings.applied} to {readings.applied}")
+            if readings.total_expansion != event.readings.total_expansion:
+                changed.append(
+                    f"total {event.readings.total_expansion} to {readings.total_expansion}"
+                )
+            if readings.permanent_expansion != event.readings.permanent_expansion:
+                changed.append(
+                    f"permanent {event.readings.permanent_expansion} to "
+                    f"{readings.permanent_expansion}"
+                )
+        if technician_badge is not None and technician_badge != event.technician_badge:
+            changed.append(f"technician {event.technician_badge} to {technician_badge}")
+        if system_code is not None and system_code != event.system_code:
+            changed.append(f"system {event.system_code} to {system_code}")
+        if not changed:
+            raise ConflictError("nothing in that correction is different from the record")
+
+        self.events.reverse(event_id, reason)
+        replacement = RequalificationEvent(
+            cylinder=event.cylinder,
+            performed_on=event.performed_on,
+            method=event.method,
+            facility_rin=event.facility_rin,
+            technician_badge=technician_badge or event.technician_badge,
+            outcome=event.outcome,
+            reasons=event.reasons,
+            system_code=system_code or event.system_code,
+            readings=readings if readings is not None else event.readings,
+            wall_thousandths_in=event.wall_thousandths_in,
+            state=EventState.REPLACEMENT,
+            starred=event.starred,
+            plus_rated=event.plus_rated,
+            star_refused=event.star_refused,
+            plus_refused=event.plus_refused,
+            reverses=event_id,
+            notes=(reason, *changed),
+        )
+        written = self.events.add(replacement, self.cylinders.id_of(event.cylinder))
+        return Correction(event_id, written, tuple(changed))

@@ -104,3 +104,86 @@ def test_a_second_restatement_of_the_same_certificate(shop_book: Book) -> None:
     service.restate_certificate(first, date(2026, 1, 1), "restated")
     with pytest.raises(ConflictError, match="already superseded"):
         service.restate_certificate(first, date(2025, 1, 1), "again")
+
+
+def test_a_typed_reading_is_corrected_not_edited(shop_book: Book) -> None:
+    from starstamp.model.testrecord import PressureReadings
+    from starstamp.model.units import Expansion, Pressure
+    from starstamp.service.restate import CorrectionService
+
+    requalify(shop_book)
+    service = CorrectionService(shop_book)
+    corrected = service.correct(
+        1,
+        "the total was typed from the wrong line of the strip",
+        readings=PressureReadings(
+            applied=Pressure(3358),
+            hold_seconds=30,
+            total_expansion=Expansion.parse("112.0"),
+            permanent_expansion=Expansion.parse("2.0"),
+        ),
+    )
+    assert corrected.reversed_id == 1
+    assert "total 110.0 cc to 112.0 cc" in corrected.describe()
+    history = service.events.for_cylinder(KEY)
+    assert [event.state.value for event in history] == ["reversed", "replacement"]
+    assert history[1].readings is not None
+    assert history[1].readings.total == Expansion.parse("112.0")
+
+
+def test_a_correction_that_changes_nothing(shop_book: Book) -> None:
+    from starstamp.service.restate import CorrectionService
+
+    requalify(shop_book)
+    service = CorrectionService(shop_book)
+    with pytest.raises(ConflictError, match="nothing in that correction"):
+        service.correct(1, "no change", system_code="WJ-1")
+
+
+def test_a_correction_needs_something_to_change(shop_book: Book) -> None:
+    from starstamp.errors import ValidationError
+    from starstamp.service.restate import CorrectionService
+
+    requalify(shop_book)
+    with pytest.raises(ValidationError, match="has to change something"):
+        CorrectionService(shop_book).correct(1, "no change")
+
+
+def test_a_reversed_record_cannot_be_corrected(shop_book: Book) -> None:
+    from starstamp.errors import NotFoundError
+    from starstamp.service.restate import CorrectionService
+
+    requalify(shop_book)
+    service = CorrectionService(shop_book)
+    service.events.reverse(1, "already pulled")
+    with pytest.raises(NotFoundError, match="has been reversed"):
+        service.correct(1, "too late", technician_badge="MR2")
+
+
+def test_the_correction_keeps_the_marks(shop_book: Book) -> None:
+    from starstamp.service.restate import CorrectionService
+    from starstamp.store.facility import TechnicianRepository
+
+    from ..support.factories import make_technician
+
+    requalify(shop_book)
+    TechnicianRepository(shop_book.connection).add(
+        make_technician(badge="MR2", name="Marisol Reyes")
+    )
+    corrected = CorrectionService(shop_book).correct(
+        1, "wrong badge on the sheet", technician_badge="MR2"
+    )
+    assert corrected.replacement.starred
+    assert corrected.replacement.technician_badge == "MR2"
+
+
+def test_a_correction_normalises_the_badge(shop_book: Book) -> None:
+    from starstamp.errors import NotFoundError
+    from starstamp.service.restate import CorrectionService
+
+    requalify(shop_book)
+    service = CorrectionService(shop_book)
+    with pytest.raises(ConflictError, match="nothing in that correction"):
+        service.correct(1, "same person", technician_badge="jt7")
+    with pytest.raises(NotFoundError, match="no technician ZZ9"):
+        service.correct(1, "nobody", technician_badge="zz9")
