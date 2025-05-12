@@ -90,3 +90,59 @@ def test_rendering(shop_book: Book) -> None:
     assert "NCI/A4471" in text
     assert "26 years" in text
     assert "volumetric pass" in text
+
+
+def test_fills_land_on_the_timeline(shop_book: Book) -> None:
+    from starstamp.model.service import NITROGEN
+    from starstamp.model.units import Pressure
+    from starstamp.service.filling import FillingService
+
+    requalify(shop_book)
+    FillingService(shop_book).record(
+        KEY, NITROGEN, date(2024, 6, 25), "JT7", pressure=Pressure(2015)
+    )
+    built = life.build(shop_book, KEY)
+    kinds = [entry.kind for entry in built.entries]
+    assert kinds == ["test", "fill"]
+    assert "nitrogen to 2015 psig" in built.entries[1].detail
+
+
+def test_a_fill_by_weight_reads_as_a_weight(shop_book: Book) -> None:
+    from starstamp.model.service import CARBON_DIOXIDE
+    from starstamp.service.filling import FillingService
+    from starstamp.store.cylinders import CylinderRepository
+
+    requalify(shop_book)
+    cylinders = CylinderRepository(shop_book.connection)
+    cylinders.change_service(KEY, CARBON_DIOXIDE)
+    cylinders.fit_valve(KEY, "320", date(2024, 6, 20))
+    FillingService(shop_book).record(
+        KEY, CARBON_DIOXIDE, date(2024, 6, 25), "JT7", weight_hundredths_lb=5000
+    )
+    built = life.build(shop_book, KEY)
+    assert "50.00 lb" in built.entries[-1].detail
+
+
+def test_a_transfer_lands_on_the_timeline(shop_book: Book) -> None:
+    from starstamp.model.owner import OwnerAccount
+    from starstamp.store.cylinders import CylinderRepository
+    from starstamp.store.owners import OwnerRepository
+
+    owners = OwnerRepository(shop_book.connection)
+    owners.add(OwnerAccount(code="FIRE7", name="Sanpete Fire", opened_on=date(2020, 1, 1)))
+    CylinderRepository(shop_book.connection).transfer(KEY, owners.id_of("FIRE7"), date(2024, 6, 25))
+    built = life.build(shop_book, KEY)
+    assert built.entries[-1].kind == "transfer"
+    assert "WELD1 to FIRE7" in built.entries[-1].detail
+
+
+def test_the_kinds_count_everything(shop_book: Book) -> None:
+    from starstamp.model.service import NITROGEN
+    from starstamp.model.units import Pressure
+    from starstamp.service.filling import FillingService
+
+    requalify(shop_book)
+    FillingService(shop_book).record(
+        KEY, NITROGEN, date(2024, 6, 25), "JT7", pressure=Pressure(2015)
+    )
+    assert life.build(shop_book, KEY).kinds() == {"fill": 1, "test": 1}

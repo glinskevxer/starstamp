@@ -285,3 +285,61 @@ def test_the_ownership_history(stocked: Invoke) -> None:
 
 def test_transferring_to_the_same_account(stocked: Invoke) -> None:
     stocked("cylinder", "transfer", "NCI/A4471", "weld1", expect=4)
+
+
+def test_the_life_shows_a_fill(stocked: Invoke) -> None:
+    stocked(
+        "facility",
+        "add",
+        "a419",
+        "Wasatch Cylinder Service",
+        "--from",
+        "2021-05-01",
+        "--until",
+        "2026-04-30",
+        "--methods",
+        "volumetric",
+    )
+    stocked("tech", "add", "jt7", "Jesse Tovar", "--methods", "volumetric", "--from", "2022-03-01")
+    for instrument, serial in (
+        ("calibrated cylinder", "CC-1"),
+        ("gauge", "PG-1"),
+        ("burette", "EB-1"),
+    ):
+        stocked(
+            "rig",
+            "certify",
+            "WJ-1",
+            instrument,
+            "--serial",
+            serial,
+            "--issued",
+            "2024-01-15",
+            "--until",
+            "2029-01-15",
+            "--by",
+            "Rocky Mountain",
+        )
+    stocked("rig", "check", "WJ-1", "40.0", "40.1", "--on", "2024-06-12")
+    stocked("cylinder", "valve", "NCI/A4471", "580", "--on", "2024-06-11")
+    stocked(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        "2024-06-12",
+        "--applied",
+        "3358",
+        "--total",
+        "30.0",
+        "--permanent",
+        "1.0",
+    )
+    stocked("fill", "record", "NCI/A4471", "--by", "jt7", "--to", "2015", "--on", "2024-06-25")
+    out = stocked("cylinder", "life", "NCI/A4471").output
+    assert "fill" in out
+    assert "nitrogen to 2015 psig" in out

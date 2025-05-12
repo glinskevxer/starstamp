@@ -17,9 +17,11 @@ from starstamp.store.cylinders import CylinderRepository
 from starstamp.store.db import Book
 from starstamp.store.disposals import DisposalRepository
 from starstamp.store.events import EventRepository
+from starstamp.store.fills import FillRepository
 from starstamp.store.lots import LotRepository
 from starstamp.store.notices import NoticeRepository
 from starstamp.store.repairs import RepairRepository
+from starstamp.store.transfers import TransferRepository
 from starstamp.text.table import render_pairs, render_table
 
 
@@ -111,6 +113,24 @@ def build(book: Book, key: CylinderKey) -> Life:
 
     for day, thousandths, source in cylinders.wall_readings(key):
         entries.append(Entry(day, "wall", f"{thousandths / 1000:.3f} in from {source}", None))
+
+    for fill in FillRepository(book.connection).for_cylinder(key):
+        detail = (
+            f"{fill.service} to {fill.pressure}"
+            if not fill.is_by_weight
+            else f"{fill.service}, {(fill.weight_hundredths_lb or 0) / 100:.2f} lb"
+        )
+        entries.append(Entry(fill.filled_on, "fill", detail, f"fill {fill.fill_id}"))
+
+    for transfer in TransferRepository(book.connection).for_cylinder(key):
+        entries.append(
+            Entry(
+                transfer.moved_on,
+                "transfer",
+                f"{transfer.from_owner or 'taken on'} to {transfer.to_owner}",
+                None,
+            )
+        )
 
     disposal = DisposalRepository(book.connection).for_cylinder(key)
     if disposal is not None:
