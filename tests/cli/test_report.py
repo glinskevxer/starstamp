@@ -61,9 +61,12 @@ def test_throughput_defaults_to_this_month(tested: Invoke) -> None:
 
 
 def test_the_day_report(tested: Invoke) -> None:
-    out = tested("report", "day", "--on", DAY).output
+    out = tested("report", "day", "--on", DAY, "--tests-only").output
     assert "NCI/A4471 volumetric pass" in out
-    assert "nothing on 2024-06-13" in tested("report", "day", "--on", "2024-06-13").output
+    assert (
+        "nothing on 2024-06-13"
+        in tested("report", "day", "--on", "2024-06-13", "--tests-only").output
+    )
 
 
 def test_the_rig_report(tested: Invoke) -> None:
@@ -260,3 +263,19 @@ def test_the_ownership_report(tested: Invoke) -> None:
     assert "NCI/A4471" in out
     assert "WELD1" in out
     assert "FIRE7" in out
+
+
+def test_the_daybook(tested: Invoke) -> None:
+    out = tested("report", "day", "--on", DAY).output
+    assert "1 test" in out
+    assert "NCI/A4471" in out
+
+
+def test_the_daybook_of_a_quiet_day(tested: Invoke) -> None:
+    assert "nothing happened on 2024-06-13" in tested("report", "day", "--on", "2024-06-13").output
+
+
+def test_the_tests_only_view(tested: Invoke) -> None:
+    out = tested("report", "day", "--on", DAY, "--tests-only").output
+    assert "NCI/A4471 volumetric pass" in out
+    assert "1 records, 1 passed" in out

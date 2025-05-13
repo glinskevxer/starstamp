@@ -16,6 +16,7 @@ from starstamp.reporting import (
     audit,
     close,
     condemnation,
+    daybook,
     fleet,
     forecast,
     pack,
@@ -79,19 +80,25 @@ def throughput_report(
 
 @report.command("day")
 @click.option("--on", "day", default=None, help="the day to read, YYYY-MM-DD")
+@click.option("--tests-only", is_flag=True, help="only the records of test")
 @pass_shop
-def day_report(shop: ShopContext, day: str | None) -> None:
+def day_report(shop: ShopContext, day: str | None, tests_only: bool) -> None:
     """Everything that happened on one day."""
     when = resolve_day(day, shop)
-    with shop.open() as handle:
-        events = throughput.standing_between(handle, when, when)
-    if not events:
-        click.echo(f"nothing on {when.isoformat()}")
+    if tests_only:
+        with shop.open() as handle:
+            events = throughput.standing_between(handle, when, when)
+        if not events:
+            click.echo(f"nothing on {when.isoformat()}")
+            return
+        for event in events:
+            click.echo(event.summary())
+        click.echo("")
+        click.echo(throughput.render_summary(events))
         return
-    for event in events:
-        click.echo(event.summary())
-    click.echo("")
-    click.echo(throughput.render_summary(events))
+    with shop.open() as handle:
+        book = daybook.build(handle, when)
+    click.echo(daybook.render(book))
 
 
 @report.command("rig")
