@@ -9,6 +9,7 @@ from pathlib import Path
 import click
 
 from starstamp import __version__
+from starstamp.cli import fleet
 from starstamp.cli.accounts import account
 from starstamp.cli.billing import contract, invoice, price
 from starstamp.cli.check import check, doctor, stats
@@ -131,6 +132,9 @@ def about(shop: ShopContext) -> None:
 
 cli.add_command(account)
 cli.add_command(cylinder)
+# fleet.py hangs its listings off the same group, so importing the module is
+# what registers them.
+_ = fleet.cylinder
 cli.add_command(requal)
 cli.add_command(facility)
 cli.add_command(tech)
