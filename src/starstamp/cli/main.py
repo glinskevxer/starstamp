@@ -43,6 +43,23 @@ EXIT_CODES: tuple[tuple[type[StarstampError], int], ...] = (
     (RuleViolationError, 5),
 )
 
+# What each status means to a batch file. The four above come from the error
+# the domain raised; the rest are raised deliberately by the commands that
+# answer a question with their exit status rather than with their output.
+STATUS_MEANINGS: tuple[tuple[int, str], ...] = (
+    (0, "it worked"),
+    (1, "something went wrong that the shop has no name for"),
+    (2, "the input would not parse, or the domain forbids it"),
+    (3, "the book does not hold what was named"),
+    (4, "the book is in a state that refuses this"),
+    (5, "the regulations forbid it"),
+    (6, "the cylinder may not be filled"),
+    (7, "the check found a problem"),
+    (8, "the check found only warnings"),
+    (9, "the file itself is not sound"),
+    (10, "the doctor found something"),
+)
+
 
 def exit_code_for(error: StarstampError) -> int:
     """Map a domain error onto the status the shop's batch files check."""
@@ -128,6 +145,13 @@ def about(shop: ShopContext) -> None:
         click.echo(f"schema version {schema_version(handle.connection)}")
         count = handle.connection.execute("SELECT count(*) FROM cylinder").fetchone()[0]
         click.echo(f"{count} cylinders")
+
+
+@cli.command("codes")
+def codes() -> None:
+    """List what each exit status means, for whoever writes the batch file."""
+    for status, meaning in STATUS_MEANINGS:
+        click.echo(f"{status}  {meaning}")
 
 
 cli.add_command(account)
