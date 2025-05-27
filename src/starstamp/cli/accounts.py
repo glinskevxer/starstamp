@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
+from starstamp.cli.output import echo_lines
 from starstamp.model.dates import parse_day
 from starstamp.model.owner import OwnerAccount, normalise_owner_code
 from starstamp.store.owners import OwnerRepository
@@ -20,6 +21,9 @@ def account() -> None:
 @click.argument("code")
 @click.argument("name")
 @click.option("--contact", default=None, help="who to call about this account")
+@click.option("--address", default=None, help="the postal address, commas between lines")
+@click.option("--phone", default=None)
+@click.option("--email", default=None)
 @click.option("--terms", type=int, default=30, show_default=True, help="payment terms in days")
 @click.option("--opened", default=None, help="the day the account opened, YYYY-MM-DD")
 @pass_shop
@@ -28,6 +32,9 @@ def add_account(
     code: str,
     name: str,
     contact: str | None,
+    address: str | None,
+    phone: str | None,
+    email: str | None,
     terms: int,
     opened: str | None,
 ) -> None:
@@ -38,6 +45,9 @@ def add_account(
         opened_on=resolve_day(opened, shop),
         contact=contact,
         terms_days=terms,
+        address=address,
+        phone=phone,
+        email=email,
     )
     with shop.open_for_write() as handle:
         OwnerRepository(handle.connection).add(account_record)
@@ -57,6 +67,9 @@ def show_account(shop: ShopContext, code: str) -> None:
                 ("code", found.code),
                 ("name", found.name),
                 ("contact", dash(found.contact)),
+                ("address", dash(found.address)),
+                ("phone", dash(found.phone)),
+                ("email", dash(found.email)),
                 ("terms", f"{found.terms_days} days"),
                 ("opened", found.opened_on.isoformat()),
                 ("closed", dash(found.closed_on)),
@@ -129,3 +142,52 @@ def statement_date(shop: ShopContext, code: str, invoiced: str) -> None:
     from datetime import timedelta
 
     click.echo((raised + timedelta(days=found.terms_days)).isoformat())
+
+
+@account.command("details")
+@click.argument("code")
+@click.option("--contact", default=None)
+@click.option("--address", default=None, help="commas between lines")
+@click.option("--phone", default=None)
+@click.option("--email", default=None)
+@click.option("--note", default=None)
+@pass_shop
+def details(
+    shop: ShopContext,
+    code: str,
+    contact: str | None,
+    address: str | None,
+    phone: str | None,
+    email: str | None,
+    note: str | None,
+) -> None:
+    """Change how the shop reaches an account."""
+    if not any((contact, address, phone, email, note)):
+        raise click.BadParameter("pass at least one thing to change")
+    with shop.open_for_write() as handle:
+        updated = OwnerRepository(handle.connection).update_details(
+            code, contact=contact, address=address, phone=phone, email=email, note=note
+        )
+    click.echo(f"{updated.code} updated")
+
+
+@account.command("unreachable")
+@pass_shop
+def unreachable(shop: ShopContext) -> None:
+    """Open accounts the shop could not post a condemnation notice to."""
+    with shop.open() as handle:
+        found = OwnerRepository(handle.connection).without_an_address()
+    echo_lines(
+        (f"{item.code} {item.name}" for item in found),
+        empty="every open account can be written to",
+    )
+
+
+@account.command("letterhead")
+@click.argument("code")
+@pass_shop
+def letterhead(shop: ShopContext, code: str) -> None:
+    """Print an account as it goes at the top of a letter."""
+    with shop.open() as handle:
+        found = OwnerRepository(handle.connection).by_code(code)
+    click.echo(found.postal_block())

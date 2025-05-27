@@ -33,14 +33,34 @@ class OwnerAccount:
     contact: str | None = None
     terms_days: int = 30
     closed_on: date | None = None
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    note: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValidationError("an account needs a name")
+        if self.email is not None and "@" not in self.email:
+            raise ValidationError(f"that is not an email address: {self.email!r}")
         if self.terms_days < 0 or self.terms_days > 180:
             raise ValidationError(f"terms of {self.terms_days} days are not a thing here")
         if self.closed_on is not None and self.closed_on < self.opened_on:
             raise ValidationError("an account cannot close before it opened")
+
+    @property
+    def can_be_written_to(self) -> bool:
+        """Whether the shop has anywhere to send a condemnation notice."""
+        return bool(self.address or self.email)
+
+    def postal_block(self) -> str:
+        """The account as it goes at the top of a letter."""
+        lines = [self.name]
+        if self.contact:
+            lines.append(f"attn {self.contact}")
+        if self.address:
+            lines.extend(part.strip() for part in self.address.split(",") if part.strip())
+        return "\n".join(lines)
 
     @property
     def is_open(self) -> bool:

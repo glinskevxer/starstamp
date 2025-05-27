@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from datetime import date
 
 from starstamp.errors import ConflictError, NotFoundError
@@ -29,6 +30,10 @@ def row_to_owner(row: sqlite3.Row) -> OwnerAccount:
         contact=as_optional_text(row["contact"]),
         terms_days=as_int(row["terms_days"]),
         closed_on=as_optional_day(row["closed_on"]),
+        address=as_optional_text(row["address"]),
+        phone=as_optional_text(row["phone"]),
+        email=as_optional_text(row["email"]),
+        note=as_optional_text(row["note"]),
     )
 
 
@@ -36,8 +41,9 @@ class OwnerRepository(Repository):
     def add(self, account: OwnerAccount) -> int:
         try:
             cursor = self.connection.execute(
-                "INSERT INTO owner_account (code, name, contact, terms_days, opened_on, closed_on)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO owner_account (code, name, contact, terms_days, opened_on,"
+                " closed_on, address, phone, email, note)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     account.code,
                     account.name,
@@ -45,6 +51,10 @@ class OwnerRepository(Repository):
                     account.terms_days,
                     day_text(account.opened_on),
                     optional_day_text(account.closed_on),
+                    account.address,
+                    account.phone,
+                    account.email,
+                    account.note,
                 ),
             )
         except sqlite3.IntegrityError as exc:
@@ -82,6 +92,46 @@ class OwnerRepository(Repository):
 
     def open_on(self, day: date) -> list[OwnerAccount]:
         return [account for account in self.all() if account.open_on(day)]
+
+    def update_details(
+        self,
+        code: str,
+        *,
+        contact: str | None = None,
+        address: str | None = None,
+        phone: str | None = None,
+        email: str | None = None,
+        note: str | None = None,
+    ) -> OwnerAccount:
+        """Change how the shop reaches an account, leaving the rest alone."""
+        account = self.by_code(code)
+        updated = replace(
+            account,
+            contact=contact if contact is not None else account.contact,
+            address=address if address is not None else account.address,
+            phone=phone if phone is not None else account.phone,
+            email=email if email is not None else account.email,
+            note=note if note is not None else account.note,
+        )
+        self.connection.execute(
+            "UPDATE owner_account SET contact = ?, address = ?, phone = ?, email = ?,"
+            " note = ? WHERE code = ?",
+            (
+                updated.contact,
+                updated.address,
+                updated.phone,
+                updated.email,
+                updated.note,
+                account.code,
+            ),
+        )
+        return self.by_code(code)
+
+    def without_an_address(self) -> list[OwnerAccount]:
+        """Open accounts the shop could not write to if it had to."""
+        return [
+            account for account in self.all() if account.is_open and not account.can_be_written_to
+        ]
 
     def close(self, code: str, day: date) -> OwnerAccount:
         account = self.by_code(code)

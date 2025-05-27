@@ -41,3 +41,56 @@ def test_show_a_missing_account(shop: Invoke) -> None:
 def test_statement_date_uses_the_account_terms(shop: Invoke) -> None:
     shop("account", "add", "weld1", "Cascade", "--terms", "45")
     assert shop("account", "statement-date", "weld1", "2024-03-01").output.strip() == "2024-04-15"
+
+
+def test_details_are_kept(shop: Invoke) -> None:
+    shop(
+        "account",
+        "add",
+        "weld1",
+        "Cascade Welding Supply",
+        "--address",
+        "1400 S Gladiola St, Salt Lake City UT",
+        "--phone",
+        "801 555 0134",
+        "--email",
+        "ruth@example.com",
+    )
+    out = shop("account", "show", "weld1").output
+    assert "1400 S Gladiola St" in out
+    assert "801 555 0134" in out
+    assert "ruth@example.com" in out
+
+
+def test_changing_the_details(shop: Invoke) -> None:
+    shop("account", "add", "weld1", "Cascade")
+    shop("account", "details", "weld1", "--phone", "801 555 0134")
+    assert "801 555 0134" in shop("account", "show", "weld1").output
+    shop("account", "details", "weld1", expect=2)
+
+
+def test_who_the_shop_cannot_write_to(shop: Invoke) -> None:
+    shop("account", "add", "weld1", "Cascade")
+    assert "WELD1 Cascade" in shop("account", "unreachable").output
+    shop("account", "details", "weld1", "--address", "1400 S Gladiola St")
+    assert "every open account can be written to" in shop("account", "unreachable").output
+
+
+def test_the_letterhead(shop: Invoke) -> None:
+    shop(
+        "account",
+        "add",
+        "weld1",
+        "Cascade Welding Supply",
+        "--contact",
+        "Ruth Alvarez",
+        "--address",
+        "1400 S Gladiola St, Salt Lake City UT 84104",
+    )
+    out = shop("account", "letterhead", "weld1").output
+    assert "attn Ruth Alvarez" in out
+    assert "Salt Lake City UT 84104" in out
+
+
+def test_a_bad_email_is_refused(shop: Invoke) -> None:
+    shop("account", "add", "weld1", "Cascade", "--email", "ruth at example", expect=2)
