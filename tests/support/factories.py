@@ -134,6 +134,7 @@ def make_owner(
     contact: str | None = None,
     terms_days: int = 30,
     closed_on: date | None = None,
+    address: str | None = "1400 S Gladiola St, Salt Lake City UT 84104",
 ) -> OwnerAccount:
     return OwnerAccount(
         code=code,
@@ -142,6 +143,7 @@ def make_owner(
         contact=contact,
         terms_days=terms_days,
         closed_on=closed_on,
+        address=address,
     )
 
 

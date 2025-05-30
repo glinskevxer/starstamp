@@ -27,6 +27,7 @@ from starstamp.store.facility import TechnicianRepository
 from starstamp.store.lots import LotRepository
 from starstamp.store.migrations import discover, schema_version
 from starstamp.store.notices import NoticeRepository
+from starstamp.store.owners import OwnerRepository
 
 
 class Severity(Enum):
@@ -103,6 +104,7 @@ class IntegrityService:
         findings.extend(self._settled_against_reversals())
         findings.extend(self._late_letters(today))
         findings.extend(self._undealt_with(today))
+        findings.extend(self._unreachable())
         return Report(tuple(findings), len(fleet))
 
     def _schema(self) -> list[Finding]:
@@ -266,6 +268,29 @@ class IntegrityService:
                     )
                 )
         return findings
+
+    def _unreachable(self) -> list[Finding]:
+        """Accounts with cylinders here and nowhere to send a letter.
+
+        It only matters for the accounts that actually have something on the
+        floor, which is why this reads the fleet rather than the account list.
+        """
+        owners = OwnerRepository(self.book.connection)
+        holding = {
+            cylinder.owner_code
+            for status in (CylinderStatus.IN_SHOP, CylinderStatus.CONDEMNED)
+            for cylinder in self.cylinders.with_status(status)
+        }
+        return [
+            Finding(
+                "reachable",
+                Severity.WARNING,
+                account.code,
+                "has cylinders here and no address or email on file",
+            )
+            for account in owners.without_an_address()
+            if account.code in holding
+        ]
 
     def _settled_against_reversals(self) -> list[Finding]:
         findings: list[Finding] = []

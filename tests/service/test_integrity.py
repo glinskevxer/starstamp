@@ -111,3 +111,24 @@ def test_a_badge_that_is_not_on_the_bench_is_a_warning(shop_book: Book) -> None:
     report = IntegrityService(shop_book).run(DAY)
     assert report.problems == ()
     assert "not on the bench" in report.findings[0].detail
+
+
+def test_an_account_with_cylinders_here_and_no_address(shop_book: Book) -> None:
+    from starstamp.store.cylinders import CylinderRepository
+
+    shop_book.connection.execute("UPDATE owner_account SET address = NULL")
+    CylinderRepository(shop_book.connection).set_status(KEY, CylinderStatus.IN_SHOP)
+    report = IntegrityService(shop_book).run(DAY)
+    assert "no address or email on file" in report.findings[0].detail
+    assert report.problems == ()
+
+
+def test_an_account_with_an_address_is_fine(shop_book: Book) -> None:
+    from starstamp.store.cylinders import CylinderRepository
+
+    CylinderRepository(shop_book.connection).set_status(KEY, CylinderStatus.IN_SHOP)
+    assert IntegrityService(shop_book).run(DAY).is_clean
+
+
+def test_an_account_with_nothing_here_is_not_flagged(shop_book: Book) -> None:
+    assert IntegrityService(shop_book).run(DAY).is_clean

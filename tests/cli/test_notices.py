@@ -36,7 +36,7 @@ def test_drafting_a_condemnation_letter(condemned: Invoke) -> None:
 def test_reading_the_letter(condemned: Invoke) -> None:
     condemned("notice", "draft", "--on", "2024-06-13")
     out = condemned("notice", "show", "1").output
-    assert "To: WELD1" in out
+    assert "Cascade Welding Supply" in out
     assert "may not be filled again" in out
     assert "bulge" in out
 
@@ -89,3 +89,19 @@ def test_listing_by_owner(condemned: Invoke) -> None:
     condemned("notice", "draft", "--on", "2024-06-13")
     condemned("notice", "send", "1", "--on", "2024-06-14")
     assert "condemnation" in condemned("notice", "list", "--owner", "weld1").output
+
+
+def test_the_letter_carries_both_addresses(condemned: Invoke) -> None:
+    condemned("account", "details", "weld1", "--address", "1400 S Gladiola St, Salt Lake City")
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "show", "1").output
+    assert "A419 Wasatch Cylinder Service" in out
+    assert "Cascade Welding Supply" in out
+    assert "1400 S Gladiola St" in out
+    assert "Salt Lake City" in out
+
+
+def test_a_letter_that_cannot_be_posted_says_so(condemned: Invoke) -> None:
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "show", "1").output
+    assert "cannot be posted" in out

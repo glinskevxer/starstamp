@@ -7,7 +7,9 @@ import click
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.cli.output import echo_lines, echo_table
 from starstamp.service.notices import NoticeService
+from starstamp.store.facility import FacilityRepository
 from starstamp.store.notices import NoticeRepository
+from starstamp.store.owners import OwnerRepository
 from starstamp.text.table import dash
 
 
@@ -76,11 +78,22 @@ def show(shop: ShopContext, notice_id: int) -> None:
     """Print one letter."""
     with shop.open() as handle:
         found = NoticeRepository(handle.connection).by_id(notice_id)
-    click.echo(f"To: {found.owner_code}")
+        account = OwnerRepository(handle.connection).by_code(found.owner_code)
+        facility = FacilityRepository(handle.connection).only()
+    click.echo(str(facility))
+    if facility.address:
+        click.echo(facility.address)
+    click.echo("")
+    click.echo("To:")
+    click.echo(account.postal_block())
+    click.echo("")
     click.echo(f"Date: {found.raised_on.isoformat()}")
     click.echo(f"Subject: {found.kind.label}, cylinder {found.cylinder_key}")
     click.echo("")
     click.echo(found.body)
+    if not account.can_be_written_to:
+        click.echo("")
+        click.echo("this account has no address on file, so this cannot be posted")
 
 
 @notice.command("send")
