@@ -279,3 +279,9 @@ def test_the_tests_only_view(tested: Invoke) -> None:
     out = tested("report", "day", "--on", DAY, "--tests-only").output
     assert "NCI/A4471 volumetric pass" in out
     assert "1 records, 1 passed" in out
+
+
+def test_the_gas_report(tested: Invoke) -> None:
+    out = tested("report", "gas", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "nitrogen" in out
+    assert "2024-06-01 to 2024-06-30" in out
