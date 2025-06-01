@@ -12,6 +12,7 @@ from starstamp.model.service import lookup_service
 from starstamp.model.units import Pressure
 from starstamp.service.fill import FillService
 from starstamp.service.filling import FillingService
+from starstamp.text import machine
 from starstamp.text.table import dash, render_table
 
 
@@ -24,8 +25,9 @@ def fill() -> None:
 @click.argument("key")
 @click.option("--gas", default=None, help="the gas going in, if it is not what it holds now")
 @click.option("--on", "day", default=None, help="the day of the fill")
+@click.option("--json", "as_json", is_flag=True, help="print it for a script instead")
 @pass_shop
-def check(shop: ShopContext, key: str, gas: str | None, day: str | None) -> None:
+def check(shop: ShopContext, key: str, gas: str | None, day: str | None, as_json: bool) -> None:
     """Say whether a cylinder may be filled, and to what."""
     wanted = CylinderKey.parse(key)
     when = resolve_day(day, shop)
@@ -34,9 +36,12 @@ def check(shop: ShopContext, key: str, gas: str | None, day: str | None) -> None
         cylinder = service.cylinders.by_key(wanted)
         chosen = lookup_service(gas) if gas else cylinder.service
         decision = service.decision(wanted, chosen, when)
-    click.echo(decision.describe())
-    if decision.due is not None:
-        click.echo(f"  due {decision.due}")
+    if as_json:
+        click.echo(machine.dumps(machine.fill_decision(decision)))
+    else:
+        click.echo(decision.describe())
+        if decision.due is not None:
+            click.echo(f"  due {decision.due}")
     if not decision.allowed:
         raise SystemExit(6)
 

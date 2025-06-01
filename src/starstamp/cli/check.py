@@ -15,19 +15,24 @@ from starstamp.store.invoices import InvoiceRepository
 from starstamp.store.lots import LotRepository
 from starstamp.store.migrations import schema_version
 from starstamp.store.notices import NoticeRepository
+from starstamp.text import machine
 from starstamp.text.table import render_pairs, render_table
 
 
 @click.command("check")
 @click.option("--on", "day", default=None, help="the day to read it as of")
 @click.option("--warnings-are-fine", is_flag=True, help="exit zero when only warnings are found")
+@click.option("--json", "as_json", is_flag=True, help="print it for a script instead")
 @pass_shop
-def check(shop: ShopContext, day: str | None, warnings_are_fine: bool) -> None:
+def check(shop: ShopContext, day: str | None, warnings_are_fine: bool, as_json: bool) -> None:
     """Look for things in the book that cannot all be true."""
     when = resolve_day(day, shop)
     with shop.open() as handle:
         report = IntegrityService(handle).run(when)
-    click.echo(report.describe())
+    if as_json:
+        click.echo(machine.dumps(machine.integrity_report(report)))
+    else:
+        click.echo(report.describe())
     if report.problems:
         raise SystemExit(7)
     if report.findings and not warnings_are_fine:
@@ -35,13 +40,35 @@ def check(shop: ShopContext, day: str | None, warnings_are_fine: bool) -> None:
 
 
 @click.command("stats")
+@click.option("--json", "as_json", is_flag=True, help="print it for a script instead")
 @pass_shop
-def stats(shop: ShopContext) -> None:
+def stats(shop: ShopContext, as_json: bool) -> None:
     """Count what is in the book."""
     with shop.open() as handle:
         cylinders = CylinderRepository(handle.connection)
         events = EventRepository(handle.connection)
         counts = {status.value: len(cylinders.with_status(status)) for status in CylinderStatus}
+        if as_json:
+            click.echo(
+                machine.dumps(
+                    machine.book_stats(
+                        {
+                            "book": str(shop.book_path),
+                            "schema": schema_version(handle.connection),
+                            "cylinders": cylinders.count(),
+                            "records_of_test": events.count(),
+                            "lots_open": len(LotRepository(handle.connection).open_lots()),
+                            "notices_unsent": len(NoticeRepository(handle.connection).unsent()),
+                            "invoices_unpaid": len(
+                                InvoiceRepository(handle.connection).outstanding()
+                            ),
+                            "test_systems": len(CalibrationRepository(handle.connection).systems()),
+                            "by_status": {name: count for name, count in counts.items() if count},
+                        }
+                    )
+                )
+            )
+            return
         click.echo(
             render_pairs(
                 [

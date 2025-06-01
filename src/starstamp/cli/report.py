@@ -29,6 +29,7 @@ from starstamp.reporting import (
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
 from starstamp.store.transfers import TransferRepository
+from starstamp.text import machine
 from starstamp.text.table import render_table
 
 
@@ -228,12 +229,16 @@ def technician_report(shop: ShopContext, first: str | None, last: str | None) ->
 @report.command("forecast")
 @click.option("--months", default=24, show_default=True, help="how far ahead to look")
 @click.option("--on", "day", default=None, help="the day to count from")
+@click.option("--json", "as_json", is_flag=True, help="print it for a script instead")
 @pass_shop
-def forecast_report(shop: ShopContext, months: int, day: str | None) -> None:
+def forecast_report(shop: ShopContext, months: int, day: str | None, as_json: bool) -> None:
     """What is coming, from the due dates already in the book."""
     when = resolve_day(day, shop)
     with shop.open() as handle:
         built = forecast.build(handle, when, months)
+    if as_json:
+        click.echo(machine.dumps(machine.forecast(built)))
+        return
     click.echo(forecast.render(built))
 
 
