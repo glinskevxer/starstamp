@@ -1,0 +1,59 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Monday morning, so a new advisory against the pinned set shows up as a
+    # red build rather than as a surprise during an audit.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]" pip-audit==2.7.3
+      - name: known advisories against the pinned set
+        # The pins are deliberately what was current in early 2025 and two of
+        # them carry advisories. Both are accepted here by id, with the reason,
+        # so that a NEW advisory against anything still fails this job.
+        #
+        # PYSEC-2026-2132  click 8.1.8. Affects shell completion quoting, which
+        #                  this package does not install.
+        # PYSEC-2026-1845  pytest 8.3.5. Affects the temporary directory a test
+        #                  run creates; a development dependency only.
+        run: |
+          pip-audit --skip-editable \
+            --ignore-vuln PYSEC-2026-2132 \
+            --ignore-vuln PYSEC-2026-1845
+      - name: the accepted list is still needed
+        # If an accepted advisory stops applying, the ignore is dead weight and
+        # this prints it. It does not fail the build; it just says so.
+        run: |
+          pip-audit --skip-editable --format json > audit.json || true
+          python - <<'PY'
+          import json
+          import pathlib
+
+          accepted = {"PYSEC-2026-2132", "PYSEC-2026-1845"}
+          report = json.loads(pathlib.Path("audit.json").read_text())
+          found = {
+              vulnerability["id"]
+              for dependency in report.get("dependencies", [])
+              for vulnerability in dependency.get("vulns", [])
+          }
+          stale = accepted - found
+          for identifier in sorted(stale):
+              print(f"accepted advisory {identifier} no longer applies")
+          print(f"{len(found)} advisories found, {len(accepted & found)} accepted")
+          PY
