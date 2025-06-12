@@ -147,6 +147,23 @@ def about(shop: ShopContext) -> None:
         click.echo(f"{count} cylinders")
 
 
+@cli.command("demo")
+@click.option("--cylinders", default=40, show_default=True, help="how many to put on the books")
+@pass_shop
+def demo(shop: ShopContext, cylinders: int) -> None:
+    """Fill an empty book with a month of a small shop's work."""
+    from starstamp.service.demo import seed
+
+    applied = shop.initialise()
+    with shop.open_for_write() as handle:
+        if handle.connection.execute("SELECT count(*) FROM cylinder").fetchone()[0]:
+            raise ConflictError(f"{shop.book_path} already has cylinders in it")
+        result = seed(handle, shop.today, cylinders=cylinders)
+    if applied:
+        click.echo(f"created {shop.book_path}")
+    click.echo(result.describe())
+
+
 @cli.command("codes")
 def codes() -> None:
     """List what each exit status means, for whoever writes the batch file."""

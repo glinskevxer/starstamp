@@ -301,6 +301,12 @@ Record a wall thickness reading.
   - `--note`
   - `--on` the day it was measured, YYYY-MM-DD
 
+### `starstamp demo`
+
+Fill an empty book with a month of a small shop's work.
+
+  - `--cylinders` how many to put on the books
+
 ### `starstamp doctor`
 
 Run every check there is, and say what each one found.
@@ -927,4 +933,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_119 commands._
+_120 commands._

@@ -121,3 +121,14 @@ def test_the_error_is_printed_with_a_prefix(book_path: Path) -> None:
     result = runner.invoke(cli, ["--book", str(book_path), "account", "show", "nope"])
     assert result.exit_code == 3
     assert "error: no book" in result.output
+
+
+def test_the_demo_command_fills_a_book(run: Invoke) -> None:
+    out = run("--today", "2025-06-08", "demo", "--cylinders", "8").output
+    assert "seeded 8 cylinders" in out
+    assert "cylinders        8" in run("stats").output
+
+
+def test_the_demo_refuses_a_book_that_has_something_in_it(run: Invoke) -> None:
+    run("--today", "2025-06-08", "demo", "--cylinders", "8")
+    run("--today", "2025-06-08", "demo", expect=4)
