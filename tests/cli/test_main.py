@@ -132,3 +132,21 @@ def test_the_demo_command_fills_a_book(run: Invoke) -> None:
 def test_the_demo_refuses_a_book_that_has_something_in_it(run: Invoke) -> None:
     run("--today", "2025-06-08", "demo", "--cylinders", "8")
     run("--today", "2025-06-08", "demo", expect=4)
+
+
+def test_about_names_the_shop(running_shop: Invoke) -> None:
+    out = running_shop("--today", "2024-06-12", "about").output
+    assert "A419 Wasatch Cylinder Service" in out
+    assert "approved to 2026-04-30" in out
+    assert "1 cylinders, 0 records of test" in out
+
+
+def test_about_says_when_the_number_has_lapsed(running_shop: Invoke) -> None:
+    out = running_shop("--today", "2027-01-04", "about").output
+    assert "not in force today" in out
+
+
+def test_about_on_a_book_with_no_facility(shop: Invoke) -> None:
+    out = shop("about").output
+    assert "no facility recorded" in out
+    assert "0 cylinders" in out

@@ -132,19 +132,64 @@ def init(shop: ShopContext) -> None:
 
 
 @cli.command()
+@click.option("--json", "as_json", is_flag=True, help="print it for a script instead")
 @pass_shop
-def about(shop: ShopContext) -> None:
-    """Say what book is open and what is in it."""
+def about(shop: ShopContext, as_json: bool) -> None:
+    """Say whose shop this is, what is open, and what is in it."""
+    from starstamp.errors import ConflictError
+    from starstamp.store.facility import FacilityRepository
     from starstamp.store.migrations import schema_version
+    from starstamp.text import machine
 
-    click.echo(f"book {shop.book_path}")
-    if not shop.book_path.exists():
-        click.echo("no book yet")
+    summary: dict[str, object] = {
+        "version": __version__,
+        "book": str(shop.book_path),
+        "schema": 0,
+        "facility": None,
+        "approved_until": None,
+        "in_force": None,
+        "methods": [],
+        "cylinders": 0,
+        "records_of_test": 0,
+    }
+    lines: list[str] = [f"starstamp {__version__}", f"book {shop.book_path}"]
+
+    if shop.book_path.exists():
+        with shop.open() as handle:
+            summary["schema"] = schema_version(handle.connection)
+            lines.append(f"schema version {summary['schema']}")
+            try:
+                facility = FacilityRepository(handle.connection).only()
+            except ConflictError as exc:
+                lines.append(str(exc))
+            else:
+                summary["facility"] = facility.rin
+                summary["approved_until"] = facility.approved_until.isoformat()
+                summary["in_force"] = facility.approved_on(shop.today)
+                summary["methods"] = [method.value for method in facility.methods]
+                lines.append(f"{facility}, approved to {facility.approved_until}")
+                if not facility.approved_on(shop.today):
+                    lines.append("the shop's number is not in force today")
+                lines.append(
+                    "methods: " + ", ".join(sorted(method.label for method in facility.methods))
+                )
+            summary["cylinders"] = handle.connection.execute(
+                "SELECT count(*) FROM cylinder"
+            ).fetchone()[0]
+            summary["records_of_test"] = handle.connection.execute(
+                "SELECT count(*) FROM requalification"
+            ).fetchone()[0]
+            lines.append(
+                f"{summary['cylinders']} cylinders, {summary['records_of_test']} records of test"
+            )
+    else:
+        lines.append("no book yet")
+
+    if as_json:
+        click.echo(machine.dumps(machine.shop_summary(summary)))
         return
-    with shop.open() as handle:
-        click.echo(f"schema version {schema_version(handle.connection)}")
-        count = handle.connection.execute("SELECT count(*) FROM cylinder").fetchone()[0]
-        click.echo(f"{count} cylinders")
+    for line in lines:
+        click.echo(line)
 
 
 @cli.command("demo")

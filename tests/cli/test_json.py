@@ -120,3 +120,31 @@ def test_the_json_is_stable_across_runs(running_shop: Invoke) -> None:
     first = running_shop("stats", "--json").output
     second = running_shop("stats", "--json").output
     assert first == second
+
+
+def test_about_as_json(running_shop: Invoke) -> None:
+    payload = parse(running_shop("--today", "2024-06-12", "about", "--json").output)
+    assert payload["facility"] == "A419"
+    assert payload["in_force"] is True
+    assert payload["cylinders"] == 1
+    assert payload["records_of_test"] == 0
+    assert "volumetric" in payload["methods"]
+
+
+def test_about_as_json_when_the_number_has_lapsed(running_shop: Invoke) -> None:
+    payload = parse(running_shop("--today", "2027-01-04", "about", "--json").output)
+    assert payload["in_force"] is False
+
+
+def test_about_as_json_before_there_is_a_book(run: Invoke) -> None:
+    payload = parse(run("about", "--json").output)
+    assert payload["schema"] == 0
+    assert payload["cylinders"] == 0
+    assert payload["facility"] is None
+
+
+def test_about_as_json_with_no_facility(shop: Invoke) -> None:
+    payload = parse(shop("about", "--json").output)
+    assert payload["facility"] is None
+    assert payload["methods"] == []
+    assert payload["schema"] > 0

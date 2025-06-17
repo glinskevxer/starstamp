@@ -97,3 +97,18 @@ def forecast(built: Any) -> dict[str, Any]:
 
 def book_stats(payload: dict[str, Any]) -> dict[str, Any]:
     return dict(sorted(payload.items()))
+
+
+def shop_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    """The about command, for a script that wants to know what it is talking to."""
+    return {
+        "version": payload["version"],
+        "book": payload["book"],
+        "schema": payload["schema"],
+        "facility": payload.get("facility"),
+        "approved_until": payload.get("approved_until"),
+        "in_force": payload.get("in_force"),
+        "methods": sorted(payload.get("methods", [])),
+        "cylinders": payload["cylinders"],
+        "records_of_test": payload["records_of_test"],
+    }

@@ -25,7 +25,9 @@ Every command takes the group options first:
 
 ### `starstamp about`
 
-Say what book is open and what is in it.
+Say whose shop this is, what is open, and what is in it.
+
+  - `--json` print it for a script instead
 
 ### `starstamp account add`
 
