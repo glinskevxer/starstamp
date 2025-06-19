@@ -615,6 +615,13 @@ What was condemned, and what those cylinders had in common.
   - `--from` first day of the window
   - `--to` last day of the window
 
+### `starstamp report cycle`
+
+How long lots take to get through the shop.
+
+  - `--from` first day of the window
+  - `--to` last day of the window
+
 ### `starstamp report day`
 
 Everything that happened on one day.
@@ -935,4 +942,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_120 commands._
+_121 commands._

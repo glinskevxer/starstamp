@@ -285,3 +285,8 @@ def test_the_gas_report(tested: Invoke) -> None:
     out = tested("report", "gas", "--from", "2024-06-01", "--to", "2024-06-30").output
     assert "nitrogen" in out
     assert "2024-06-01 to 2024-06-30" in out
+
+
+def test_the_cycle_report(tested: Invoke) -> None:
+    out = tested("report", "cycle", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "no lots went back" in out

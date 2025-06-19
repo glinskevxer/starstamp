@@ -16,6 +16,7 @@ from starstamp.reporting import (
     audit,
     close,
     condemnation,
+    cycle,
     daybook,
     fleet,
     forecast,
@@ -316,3 +317,16 @@ def gas_report(shop: ShopContext, first: str | None, last: str | None) -> None:
         built = gases.build(handle, window.first, window.last)
     click.echo(str(window))
     click.echo(gases.render(built))
+
+
+@report.command("cycle")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def cycle_report(shop: ShopContext, first: str | None, last: str | None) -> None:
+    """How long lots take to get through the shop."""
+    window = resolve_window(shop.today, first=first, last=last)
+    with shop.open() as handle:
+        built = cycle.build(handle, window.first, window.last)
+    click.echo(str(window))
+    click.echo(cycle.render(built))
