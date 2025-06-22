@@ -94,7 +94,15 @@ def required_test_pressure(specification: Specification) -> Pressure:
     marking it was never given.
     """
     factor = pressure_factor(specification)
-    return specification.require_service_pressure().scaled(factor)
+    if specification.service_pressure is None:
+        # A UN marking carries a test pressure of its own rather than a
+        # service pressure, and the shop reads that off the cylinder. Until it
+        # is recorded there is nothing here to derive from.
+        raise RuleViolationError(
+            f"{specification} carries no service pressure to derive a test pressure from",
+            CITATION,
+        )
+    return specification.service_pressure.scaled(factor)
 
 
 def methods_requiring_expansion(

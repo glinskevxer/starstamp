@@ -92,3 +92,10 @@ def test_acetylene_has_no_test_pressure_to_derive() -> None:
 def test_methods_requiring_expansion_narrows_to_the_measuring_ones() -> None:
     assert methods_requiring_expansion(WELDED, AMMONIA) == frozenset({Method.VOLUMETRIC})
     assert methods_requiring_expansion(ACETYLENE_SPEC, NITROGEN) == frozenset()
+
+
+def test_a_un_marking_has_no_service_pressure_to_derive_from() -> None:
+    un = parse_specification("UN ISO 9809-1")
+    assert pressure_factor(un) == Fraction(3, 2)
+    with pytest.raises(RuleViolationError, match="no service pressure to derive"):
+        required_test_pressure(un)
