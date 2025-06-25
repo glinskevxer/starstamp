@@ -709,6 +709,13 @@ Work the shop has done and not charged for.
 
   - `--on` the day to count up to
 
+### `starstamp report worklist`
+
+Everything the shop owes somebody, on one list.
+
+  - `--on` the day to read it for
+  - `--due-within` months ahead for due dates
+
 ### `starstamp requal batch`
 
 Enter a day's bench sheet in one go.
@@ -942,4 +949,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_121 commands._
+_122 commands._

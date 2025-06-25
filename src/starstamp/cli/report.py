@@ -29,6 +29,7 @@ from starstamp.reporting import (
 )
 from starstamp.service.receiving import ReceivingService
 from starstamp.service.repair import RepairService
+from starstamp.service.worklist import WorklistService
 from starstamp.store.transfers import TransferRepository
 from starstamp.text import machine
 from starstamp.text.table import render_table
@@ -330,3 +331,15 @@ def cycle_report(shop: ShopContext, first: str | None, last: str | None) -> None
         built = cycle.build(handle, window.first, window.last)
     click.echo(str(window))
     click.echo(cycle.render(built))
+
+
+@report.command("worklist")
+@click.option("--on", "day", default=None, help="the day to read it for")
+@click.option("--due-within", default=3, show_default=True, help="months ahead for due dates")
+@pass_shop
+def worklist_report(shop: ShopContext, day: str | None, due_within: int) -> None:
+    """Everything the shop owes somebody, on one list."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        built = WorklistService(handle).build(when, due_within=due_within)
+    click.echo(built.describe())

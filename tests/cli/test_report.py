@@ -290,3 +290,12 @@ def test_the_gas_report(tested: Invoke) -> None:
 def test_the_cycle_report(tested: Invoke) -> None:
     out = tested("report", "cycle", "--from", "2024-06-01", "--to", "2024-06-30").output
     assert "no lots went back" in out
+
+
+def test_the_worklist(tested: Invoke) -> None:
+    out = tested("report", "worklist", "--on", "2024-06-13").output
+    assert "unbilled" in out
+
+
+def test_a_clear_worklist(running_shop: Invoke) -> None:
+    assert "nothing outstanding" in running_shop("report", "worklist", "--on", "2024-06-13").output
