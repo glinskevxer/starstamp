@@ -18,9 +18,15 @@ def book_path(tmp_path: Path) -> Path:
 def run(book_path: Path) -> Invoke:
     runner = CliRunner()
 
-    def invoke(*args: str, expect: int = 0) -> Result:
+    def invoke(*args: str, expect: int | None = 0) -> Result:
+        """Run the command line against this test's book.
+
+        `expect` is the status the caller is asserting; pass None where the
+        test wants the result whatever it was.
+        """
         result = runner.invoke(cli, ["--book", str(book_path), *args])
-        assert result.exit_code == expect, result.output
+        if expect is not None:
+            assert result.exit_code == expect, result.output
         return result
 
     return invoke
