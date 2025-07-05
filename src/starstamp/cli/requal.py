@@ -7,7 +7,8 @@ from pathlib import Path
 import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
-from starstamp.errors import ValidationError
+from starstamp.cli.output import echo_table
+from starstamp.errors import RuleViolationError, ValidationError
 from starstamp.model.acetylene import AcetyleneExam
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.defect import DefectKind, Observation, parse_thousandths
@@ -15,9 +16,12 @@ from starstamp.model.method import Method
 from starstamp.model.testrecord import PressureReadings
 from starstamp.model.ultrasonic import Position, Reading, Scan
 from starstamp.model.units import Expansion, Pressure
+from starstamp.rules.authorisation import choose_method
 from starstamp.service.batch import BatchService
+from starstamp.service.fill import FillService
 from starstamp.service.requalify import RequalificationRequest, RequalificationService
 from starstamp.store.events import EventRepository
+from starstamp.store.facility import FacilityRepository, TechnicianRepository
 from starstamp.text.table import dash, render_pairs, render_table
 
 
@@ -310,3 +314,55 @@ def sheet(rows: int) -> None:
     click.echo("cylinder,applied,total,permanent,hold,defects")
     for index in range(max(rows, 0)):
         click.echo(f"NCI/A{4471 + index},3358,110.0,2.0,30,")
+
+
+@requal.command("due")
+@click.option("--within", default=3, show_default=True, help="months ahead to look")
+@click.option("--owner", default=None, help="only this account")
+@click.option("--tech", default=None, help="whose sign off to plan against")
+@click.option("--on", "day", default=None)
+@pass_shop
+def due(
+    shop: ShopContext, within: int, owner: str | None, tech: str | None, day: str | None
+) -> None:
+    """What is coming due, and the method the shop would use on each.
+
+    The method is not a guess. It is what the shop would actually choose given
+    the cylinder, its gas, the shop's own approval and the person named, so a
+    cylinder that nobody on today's bench can requalify says so here rather
+    than at the bench.
+    """
+    when = resolve_day(day, shop)
+    rows: list[list[str]] = []
+    with shop.open() as handle:
+        service = FillService(handle)
+        facilities = FacilityRepository(handle.connection)
+        technicians = TechnicianRepository(handle.connection)
+        facility = facilities.only()
+        person = technicians.by_badge(tech) if tech else None
+        for row in service.due_within(
+            when, within, owner_code=None if owner is None else owner.upper()
+        ):
+            method = "-"
+            if person is not None:
+                try:
+                    method = choose_method(row.cylinder, facility, person, when).label
+                except RuleViolationError as exc:
+                    method = f"none: {exc}"
+            rows.append(
+                [
+                    str(row.cylinder.key),
+                    row.cylinder.owner_code,
+                    str(row.cylinder.specification),
+                    row.cylinder.service.code,
+                    "never tested" if row.never_tested else str(row.due),
+                    "-" if row.months_left is None else str(row.months_left),
+                    method,
+                ]
+            )
+    echo_table(
+        ["cylinder", "owner", "spec", "gas", "due", "months", "method"],
+        rows,
+        right=(5,),
+        empty=f"nothing falls due inside {within} months",
+    )

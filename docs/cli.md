@@ -726,6 +726,15 @@ Enter a day's bench sheet in one go.
   - `--on` the day of the sheet
   - `--method`
 
+### `starstamp requal due`
+
+What is coming due, and the method the shop would use on each.
+
+  - `--within` months ahead to look
+  - `--owner` only this account
+  - `--tech` whose sign off to plan against
+  - `--on`
+
 ### `starstamp requal history`
 
 Show every record of test for a cylinder.
@@ -949,4 +958,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_122 commands._
+_123 commands._

@@ -6,7 +6,7 @@ from starstamp.cli.requal import build_readings, parse_defect
 from starstamp.errors import ValidationError
 from starstamp.model.defect import DefectKind
 
-from .conftest import Invoke
+from .conftest import DAY, Invoke
 
 
 @pytest.fixture
@@ -159,3 +159,90 @@ def test_a_batch_with_the_wrong_columns(running_shop: Invoke, tmp_path: Path) ->
     path = tmp_path / "sheet.csv"
     path.write_text("cylinder\nNCI/A4471\n")
     running_shop("requal", "batch", str(path), "--tech", "jt7", "--system", "WJ-1", expect=1)
+
+
+def test_what_is_due(running_shop: Invoke) -> None:
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+    )
+    out = running_shop("requal", "due", "--on", "2034-04-01", "--within", "3").output
+    assert "NCI/A4471" in out
+    assert "06-34" in out
+
+
+def test_a_cylinder_that_was_never_tested_is_on_the_due_list(running_shop: Invoke) -> None:
+    out = running_shop("requal", "due", "--on", "2024-06-12").output
+    assert "never tested" in out
+    assert "NCI/A4471" in out
+
+
+def test_the_method_is_planned_against_a_badge(running_shop: Invoke) -> None:
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+    )
+    out = running_shop(
+        "requal", "due", "--on", "2024-06-12", "--within", "200", "--tech", "jt7"
+    ).output
+    assert "volumetric" in out
+
+
+def test_a_cylinder_nobody_on_the_bench_can_do(running_shop: Invoke) -> None:
+    running_shop(
+        "requal",
+        "run",
+        "NCI/A4471",
+        "--tech",
+        "jt7",
+        "--system",
+        "WJ-1",
+        "--on",
+        DAY,
+        "--applied",
+        "3358",
+        "--total",
+        "110.0",
+        "--permanent",
+        "2.0",
+    )
+    running_shop(
+        "tech",
+        "add",
+        "ac1",
+        "Only Acetylene",
+        "--methods",
+        "acetylene",
+        "--from",
+        "2022-03-01",
+    )
+    out = running_shop(
+        "requal", "due", "--on", "2024-06-12", "--within", "200", "--tech", "ac1"
+    ).output
+    assert "none:" in out
