@@ -105,3 +105,37 @@ def test_a_letter_that_cannot_be_posted_says_so(condemned: Invoke) -> None:
     condemned("notice", "draft", "--on", "2024-06-13")
     out = condemned("notice", "show", "1").output
     assert "cannot be posted" in out
+
+
+def test_sending_them_all(condemned: Invoke) -> None:
+    condemned("account", "details", "weld1", "--address", "1400 S Gladiola St")
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "send-all", "--on", "2024-06-14").output
+    assert "1 letters sent" in out
+    assert "no notices" in condemned("notice", "list", "--unsent").output
+
+
+def test_a_dry_run_sends_nothing(condemned: Invoke) -> None:
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "send-all", "--dry-run").output
+    assert "1 letters would go" in out
+    assert "(no address)" in out
+    assert "condemnation" in condemned("notice", "list", "--unsent").output
+
+
+def test_a_letter_with_nowhere_to_go_is_held(condemned: Invoke) -> None:
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "send-all", "--on", "2024-06-14").output
+    assert "0 letters sent" in out
+    assert "has no address on file" in out
+
+
+def test_nothing_waiting(running_shop: Invoke) -> None:
+    assert "nothing waiting to go out" in running_shop("notice", "send-all").output
+
+
+def test_sending_only_one_kind(condemned: Invoke) -> None:
+    condemned("account", "details", "weld1", "--address", "1400 S Gladiola St")
+    condemned("notice", "draft", "--on", "2024-06-13")
+    out = condemned("notice", "send-all", "--kind", "due_soon", "--on", "2024-06-14").output
+    assert "nothing waiting to go out" in out

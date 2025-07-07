@@ -546,6 +546,14 @@ Mark a letter as gone out.
   - `NOTICE_ID` (argument)
   - `--on`
 
+### `starstamp notice send-all`
+
+Send every letter that is still waiting.
+
+  - `--on` the day they went out
+  - `--kind` only this kind of letter
+  - `--dry-run` list what would go and send nothing
+
 ### `starstamp notice show`
 
 Print one letter.
@@ -958,4 +966,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_123 commands._
+_124 commands._

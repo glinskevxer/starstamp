@@ -6,6 +6,7 @@ import click
 
 from starstamp.cli.context import ShopContext, pass_shop, resolve_day
 from starstamp.cli.output import echo_lines, echo_table
+from starstamp.model.notice import NoticeKind
 from starstamp.service.notices import NoticeService
 from starstamp.store.facility import FacilityRepository
 from starstamp.store.notices import NoticeRepository
@@ -117,3 +118,51 @@ def late(shop: ShopContext, day: str | None) -> None:
     with shop.open() as handle:
         found = NoticeService(handle).overdue_letters(when)
     echo_lines((f"{item.summary()}, due {item.due_by()}" for item in found), empty="nothing late")
+
+
+@notice.command("send-all")
+@click.option("--on", "day", default=None, help="the day they went out")
+@click.option("--kind", default=None, help="only this kind of letter")
+@click.option("--dry-run", is_flag=True, help="list what would go and send nothing")
+@pass_shop
+def send_all(shop: ShopContext, day: str | None, kind: str | None, dry_run: bool) -> None:
+    """Send every letter that is still waiting.
+
+    The shop prints a stack, signs them and posts them, and then wants one
+    command rather than one per letter. A letter to an account with no address
+    is left where it is and named, because marking it sent would be a lie.
+    """
+    when = resolve_day(day, shop)
+    wanted = None if kind is None else NoticeKind(kind.strip().lower().replace(" ", "_"))
+    with shop.open() as handle:
+        waiting = [
+            item
+            for item in NoticeRepository(handle.connection).unsent()
+            if wanted is None or item.kind is wanted
+        ]
+        owners = OwnerRepository(handle.connection)
+        reachable = {
+            item.notice_id: owners.by_code(item.owner_code).can_be_written_to for item in waiting
+        }
+    if not waiting:
+        click.echo("nothing waiting to go out")
+        return
+    if dry_run:
+        for item in waiting:
+            mark = "" if reachable[item.notice_id] else "  (no address)"
+            click.echo(f"{item.summary()}{mark}")
+        click.echo(f"{len(waiting)} letters would go")
+        return
+
+    sent = 0
+    with shop.open_for_write() as handle:
+        service = NoticeService(handle)
+        for item in waiting:
+            if item.notice_id is None or not reachable[item.notice_id]:
+                continue
+            service.send(item.notice_id, when)
+            sent += 1
+    click.echo(f"{sent} letters sent")
+    held = [item for item in waiting if not reachable[item.notice_id]]
+    for item in held:
+        click.echo(f"  held: {item.owner_code} has no address on file")
