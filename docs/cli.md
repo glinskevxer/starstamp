@@ -576,6 +576,30 @@ Open a new price, closing whatever it replaces.
   - `--from` the day it starts, YYYY-MM-DD
   - `--description`
 
+### `starstamp remark available`
+
+What the book could stand behind if this cylinder needed re-marking.
+
+  - `KEY` (argument)
+
+### `starstamp remark history`
+
+Every re-marking on a cylinder.
+
+  - `KEY` (argument)
+
+### `starstamp remark stamp`
+
+Restore marks to a cylinder, from evidence the shop can show.
+
+  - `KEY` (argument)
+  - `--mark` KIND=READING, repeat
+  - `--from` ours, owner or manufacturer_letter
+  - `--tech` who stamped it
+  - `--on`
+  - `--rin` name the RIN when the book holds more than one
+  - `--note`
+
 ### `starstamp repair do`
 
 Book a repair.
@@ -966,4 +990,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_124 commands._
+_127 commands._

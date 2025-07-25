@@ -19,6 +19,7 @@ from starstamp.store.disposals import DisposalRepository
 from starstamp.store.events import EventRepository
 from starstamp.store.fills import FillRepository
 from starstamp.store.lots import LotRepository
+from starstamp.store.markings import RemarkingRepository
 from starstamp.store.notices import NoticeRepository
 from starstamp.store.repairs import RepairRepository
 from starstamp.store.transfers import TransferRepository
@@ -129,6 +130,16 @@ def build(book: Book, key: CylinderKey) -> Life:
                 "transfer",
                 f"{transfer.from_owner or 'taken on'} to {transfer.to_owner}",
                 None,
+            )
+        )
+
+    for remarking in RemarkingRepository(book.connection).for_cylinder(key):
+        entries.append(
+            Entry(
+                remarking.marked_on,
+                "remark",
+                ", ".join(str(mark) for mark in remarking.marks),
+                f"re-marking {remarking.remarking_id}",
             )
         )
 
