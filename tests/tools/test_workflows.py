@@ -55,10 +55,6 @@ def test_the_gate_the_shop_runs_locally_is_in_the_build() -> None:
         assert step in ci, step
 
 
-def test_the_coverage_floor_is_set() -> None:
-    assert "--cov-fail-under=95" in workflow("ci.yml")
-
-
 def test_the_accepted_advisories_are_named_with_a_reason() -> None:
     security = workflow("security.yml")
     identifiers = re.findall(r"PYSEC-\d{4}-\d+", security)
@@ -78,3 +74,20 @@ def test_the_build_installs_the_package_it_is_testing(name: str) -> None:
         editable = "-e ." in line or '-e ".' in line
         plain = line.strip().endswith("pip install .")
         assert pinned or editable or plain, line
+
+
+def test_the_coverage_floor_is_where_the_suite_actually_is() -> None:
+    assert "--cov-fail-under=97" in workflow("ci.yml")
+
+
+def test_every_job_has_a_timeout() -> None:
+    for name in ("ci.yml", "security.yml"):
+        text = workflow(name)
+        jobs = re.findall(r"^  (\w+):\n    runs-on:", text, flags=re.MULTILINE)
+        assert text.count("timeout-minutes:") == len(jobs), name
+
+
+def test_a_second_push_cancels_the_first() -> None:
+    ci = workflow("ci.yml")
+    assert "concurrency:" in ci
+    assert "cancel-in-progress: true" in ci

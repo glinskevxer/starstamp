@@ -81,3 +81,47 @@ def test_the_kinds_are_listed(shop_book: Book) -> None:
     requalify(shop_book)
     built = WorklistService(shop_book).build(DAY)
     assert "unbilled" in built.kinds()
+
+
+def test_an_overdue_invoice_is_on_the_list(shop_book: Book) -> None:
+    from starstamp.model.money import Money
+    from starstamp.model.pricing import PriceItem
+    from starstamp.service.billing import BillingService
+    from starstamp.store.pricing import PriceRepository
+
+    PriceRepository(shop_book.connection).add(
+        PriceItem(
+            code="REQUAL_WJ",
+            description="wj",
+            amount=Money.parse("14.50"),
+            effective_from=date(2023, 1, 1),
+        )
+    )
+    requalify(shop_book)
+    BillingService(shop_book).raise_invoice(
+        "WELD1", date(2024, 6, 1), date(2024, 6, 30), date(2024, 7, 1)
+    )
+    built = WorklistService(shop_book).build(date(2024, 9, 1))
+    assert built.of_kind("invoice overdue")
+    assert "I2024-0001" in built.of_kind("invoice overdue")[0].detail
+
+
+def test_a_lapsed_sign_off_is_on_the_list(shop_book: Book) -> None:
+    from starstamp.store.facility import TechnicianRepository
+
+    TechnicianRepository(shop_book.connection).renew("JT7", date(2024, 1, 1))
+    built = WorklistService(shop_book).build(DAY)
+    assert built.of_kind("sign off lapsed")
+
+
+def test_a_sign_off_about_to_lapse(shop_book: Book) -> None:
+    from starstamp.store.facility import TechnicianRepository
+
+    TechnicianRepository(shop_book.connection).renew("JT7", date(2024, 7, 1))
+    built = WorklistService(shop_book).build(DAY)
+    assert built.of_kind("sign off due")
+
+
+def test_a_rin_about_to_lapse(shop_book: Book) -> None:
+    built = WorklistService(shop_book).build(date(2026, 4, 1))
+    assert built.of_kind("rin due")

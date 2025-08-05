@@ -102,3 +102,40 @@ def test_open_lots_come_back_with_their_lines(shop_book: Book) -> None:
 def test_a_cylinder_not_on_any_lot_settles_nothing(shop_book: Book) -> None:
     requalify(shop_book)
     assert ReceivingService(shop_book).open_standing() == []
+
+
+def test_a_lot_that_is_ready_takes_no_more_cylinders(shop_book: Book) -> None:
+    service = ReceivingService(shop_book)
+    other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
+    service.receive("WELD1", RECEIVED, [KEY])
+    requalify(shop_book)
+    service.ready("L2024-0001")
+    with pytest.raises(ConflictError, match="takes no more cylinders"):
+        service.lots.add_line("L2024-0001", service.cylinders.id_of(other), other, RECEIVED)
+
+
+def test_a_cylinder_already_in_the_shop_stays_where_it_is(shop_book: Book) -> None:
+    cylinders = CylinderRepository(shop_book.connection)
+    cylinders.set_status(KEY, CylinderStatus.AWAITING_REPAIR)
+    ReceivingService(shop_book).receive("WELD1", RECEIVED, [KEY])
+    assert cylinders.by_key(KEY).status is CylinderStatus.AWAITING_REPAIR
+
+
+def test_settling_reads_only_the_open_lots(shop_book: Book) -> None:
+    service = ReceivingService(shop_book)
+    service.receive("WELD1", RECEIVED, [KEY])
+    requalify(shop_book)
+    service.ready("L2024-0001")
+    service.return_lot("L2024-0001", date(2024, 6, 20))
+    events = service.lots.lines("L2024-0001")
+    assert events[0].is_settled
+    assert service.open_standing() == []
+
+
+def test_a_lot_with_nothing_on_it_is_never_finished(shop_book: Book) -> None:
+    service = ReceivingService(shop_book)
+    service.receive("WELD1", RECEIVED, [])
+    standing = service.standing("L2024-0001")
+    assert not standing.is_finished
+    with pytest.raises(ConflictError, match="nothing decided"):
+        service.ready("L2024-0001")
