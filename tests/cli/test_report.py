@@ -299,3 +299,9 @@ def test_the_worklist(tested: Invoke) -> None:
 
 def test_a_clear_worklist(running_shop: Invoke) -> None:
     assert "nothing outstanding" in running_shop("report", "worklist", "--on", "2024-06-13").output
+
+
+def test_the_account_page(tested: Invoke) -> None:
+    out = tested("--today", "2024-07-01", "report", "account", "weld1").output
+    assert "WELD1 Cascade Welding Supply" in out
+    assert "cylinders" in out

@@ -13,6 +13,9 @@ from starstamp.cli.windows import resolve as resolve_window
 from starstamp.model.cylinder import CylinderKey
 from starstamp.model.dates import StampedMonth
 from starstamp.reporting import (
+    account as account_page,
+)
+from starstamp.reporting import (
     audit,
     close,
     condemnation,
@@ -343,3 +346,15 @@ def worklist_report(shop: ShopContext, day: str | None, due_within: int) -> None
     with shop.open() as handle:
         built = WorklistService(handle).build(when, due_within=due_within)
     click.echo(built.describe())
+
+
+@report.command("account")
+@click.argument("owner")
+@click.option("--month", default=None, help="the month to state, YYYY-MM")
+@pass_shop
+def account_report(shop: ShopContext, owner: str, month: str | None) -> None:
+    """One account on one page: fleet, money and what is in the shop."""
+    window = resolve_window(shop.today, month=month)
+    with shop.open() as handle:
+        page = account_page.build(handle, owner, window.first, window.last, shop.today)
+    click.echo(account_page.render(page))

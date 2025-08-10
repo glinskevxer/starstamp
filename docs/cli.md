@@ -628,6 +628,13 @@ What this cylinder may legally have done to it.
 
   - `KEY` (argument)
 
+### `starstamp report account`
+
+One account on one page: fleet, money and what is in the shop.
+
+  - `OWNER` (argument)
+  - `--month` the month to state, YYYY-MM
+
 ### `starstamp report bench`
 
 The work sheet: what is in the shop and what each one needs.
@@ -990,4 +997,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_127 commands._
+_128 commands._
