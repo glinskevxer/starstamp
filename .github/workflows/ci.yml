@@ -35,6 +35,8 @@ jobs:
         run: python -m starstamp.tools.check_workflow
       - name: the command reference matches the commands
         run: python -m starstamp.tools.generate_cli_reference --check
+      - name: the repository's own house rules
+        run: python -m starstamp.tools.check_repo
 
   types:
     runs-on: ubuntu-latest
