@@ -216,3 +216,52 @@ def change_service(shop: ShopContext, key: str, gas: str) -> None:
         moved = CylinderRepository(handle.connection).change_service(wanted, service)
     needed = outlet_for_service(moved.service.code)
     click.echo(f"{moved.key} is now in {moved.service} service and needs {needed}")
+
+
+@cylinder.command("measure")
+@click.argument("key")
+@click.argument("kind")
+@click.argument("reading")
+@click.option("--source", default="read off the cylinder", show_default=True)
+@click.option("--note", default=None)
+@click.option("--on", "day", default=None, help="the day it was measured")
+@pass_shop
+def measure(
+    shop: ShopContext,
+    key: str,
+    kind: str,
+    reading: str,
+    source: str,
+    note: str | None,
+    day: str | None,
+) -> None:
+    """Record a tare weight, water capacity or rejection limit read off a cylinder."""
+    wanted = CylinderKey.parse(key)
+    cleaned = kind.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {"tw": "tare", "wc": "water_capacity", "ree": "rejection_limit"}
+    cleaned = aliases.get(cleaned, cleaned)
+    if cleaned == "tare":
+        value = round(float(reading) * 100)
+    elif cleaned == "water_capacity":
+        value = round(float(reading) * 10)
+    else:
+        value = Expansion.parse(reading).tenths_cc
+    with shop.open_for_write() as handle:
+        updated = CylinderRepository(handle.connection).measure(
+            wanted, cleaned, value, resolve_day(day, shop), source, note
+        )
+    click.echo(f"{updated.key} {cleaned} recorded as {reading} from {source}")
+
+
+@cylinder.command("measurements")
+@click.argument("key")
+@pass_shop
+def measurements(shop: ShopContext, key: str) -> None:
+    """Every measurement read off a cylinder here."""
+    wanted = CylinderKey.parse(key)
+    with shop.open() as handle:
+        found = CylinderRepository(handle.connection).measurements(wanted)
+    echo_lines(
+        (f"{taken.isoformat()}  {kind}  {value}  {source}" for taken, kind, value, source in found),
+        empty=f"nothing has been measured on {wanted} here",
+    )

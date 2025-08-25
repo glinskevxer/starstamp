@@ -211,3 +211,39 @@ def test_searching_by_maker_and_limiting(
 
 def test_a_search_that_matches_nothing(cylinders: CylinderRepository) -> None:
     assert cylinders.search(owner_code="NOBODY") == []
+
+
+def test_a_measurement_is_kept_and_carried_forward(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    key = CylinderKey.of("NCI", "A4471")
+    updated = cylinders.measure(key, "tare", 11800, date(2024, 6, 14), "shop scale")
+    assert updated.tare_hundredths_lb == 11800
+    history = cylinders.measurements(key)
+    assert history == [(date(2024, 6, 14), "tare", 11800, "shop scale")]
+
+
+def test_every_kind_of_measurement(cylinders: CylinderRepository, owners: OwnerRepository) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    key = CylinderKey.of("NCI", "A4471")
+    cylinders.measure(key, "water_capacity", 440, date(2024, 6, 14), "water fill")
+    cylinders.measure(key, "rejection_limit", 312, date(2024, 6, 14), "crown")
+    updated = cylinders.by_key(key)
+    assert updated.water_capacity_tenths_l == 440
+    assert updated.require_ree() == Expansion(312)
+    assert len(cylinders.measurements(key)) == 2
+
+
+def test_a_measurement_the_shop_does_not_take(
+    cylinders: CylinderRepository, owners: OwnerRepository
+) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    with pytest.raises(Exception, match="the shop measures"):
+        cylinders.measure(CylinderKey.of("NCI", "A4471"), "height", 10, date(2024, 6, 14), "tape")
+
+
+def test_a_measurement_of_nothing(cylinders: CylinderRepository, owners: OwnerRepository) -> None:
+    cylinders.add(a_cylinder(), owners.id_of("WELD1"), RECORDED)
+    with pytest.raises(ConflictError, match="not a measurement"):
+        cylinders.measure(CylinderKey.of("NCI", "A4471"), "tare", 0, date(2024, 6, 14), "scale")

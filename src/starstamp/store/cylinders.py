@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from starstamp.errors import ConflictError, NotFoundError
+from starstamp.errors import ConflictError, NotFoundError, ValidationError
 from starstamp.model.cylinder import Cylinder, CylinderKey, CylinderStatus
 from starstamp.model.dates import StampedMonth
 from starstamp.model.service import GasService, lookup_service
@@ -301,6 +301,61 @@ class CylinderRepository(Repository):
             tail = f"{tail} LIMIT {int(limit)}"
         rows = self._all(f"{self._SELECT}{where}{tail}", tuple(parameters))
         return [row_to_cylinder(row, as_text(row["owner_code"])) for row in rows]
+
+    MEASUREMENTS = {
+        "tare": "tare_hundredths_lb",
+        "water_capacity": "water_capacity_tenths_l",
+        "rejection_limit": "ree_tenths_cc",
+    }
+
+    def measure(
+        self,
+        key: CylinderKey,
+        kind: str,
+        value: int,
+        taken_on: date,
+        source: str,
+        note: str | None = None,
+    ) -> Cylinder:
+        """Record a measurement read off the cylinder, and carry it forward.
+
+        The reading is kept as well as applied. A cylinder condemned on its
+        weight was condemned against whichever tare was in force then, and an
+        auditor asking about that gets a row rather than a shrug.
+        """
+        column = self.MEASUREMENTS.get(kind)
+        if column is None:
+            known = ", ".join(sorted(self.MEASUREMENTS))
+            raise ValidationError(f"the shop measures {known}, not {kind!r}")
+        if value <= 0:
+            raise ConflictError(f"a {kind} of {value} is not a measurement")
+        cylinder_id = self.id_of(key)
+        self.connection.execute(
+            "INSERT INTO measurement (cylinder_id, taken_on, kind, value, source, note)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (cylinder_id, day_text(taken_on), kind, value, source, note),
+        )
+        self.connection.execute(
+            f"UPDATE cylinder SET {column} = ? WHERE id = ?",  # noqa: S608
+            (value, cylinder_id),
+        )
+        return self.by_key(key)
+
+    def measurements(self, key: CylinderKey) -> list[tuple[date, str, int, str]]:
+        rows = self._all(
+            "SELECT taken_on, kind, value, source FROM measurement WHERE cylinder_id = ?"
+            " ORDER BY taken_on, id",
+            (self.id_of(key),),
+        )
+        return [
+            (
+                as_day(row["taken_on"]),
+                as_text(row["kind"]),
+                as_int(row["value"]),
+                as_text(row["source"]),
+            )
+            for row in rows
+        ]
 
     def by_key_from(self, text: str) -> CylinderKey:
         """Read a SYMBOL/SERIAL string back into a key this book knows."""

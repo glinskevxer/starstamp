@@ -227,6 +227,23 @@ List cylinders.
   - `--owner` only this account's cylinders
   - `--status` only cylinders in this status
 
+### `starstamp cylinder measure`
+
+Record a tare weight, water capacity or rejection limit read off a cylinder.
+
+  - `KEY` (argument)
+  - `KIND` (argument)
+  - `READING` (argument)
+  - `--source`
+  - `--note`
+  - `--on` the day it was measured
+
+### `starstamp cylinder measurements`
+
+Every measurement read off a cylinder here.
+
+  - `KEY` (argument)
+
 ### `starstamp cylinder owners`
 
 Who has owned a cylinder.
@@ -997,4 +1014,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_128 commands._
+_130 commands._

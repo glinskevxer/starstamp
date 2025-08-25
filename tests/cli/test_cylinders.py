@@ -343,3 +343,27 @@ def test_the_life_shows_a_fill(stocked: Invoke) -> None:
     out = stocked("cylinder", "life", "NCI/A4471").output
     assert "fill" in out
     assert "nitrogen to 2015 psig" in out
+
+
+def test_measuring_a_cylinder(stocked: Invoke) -> None:
+    out = stocked("cylinder", "measure", "NCI/A4471", "tare", "118.0", "--on", "2024-06-14").output
+    assert "tare recorded as 118.0" in out
+    history = stocked("cylinder", "measurements", "NCI/A4471").output
+    assert "tare" in history
+    assert "11800" in history
+
+
+def test_the_shorthand_kinds(stocked: Invoke) -> None:
+    stocked("cylinder", "measure", "NCI/A4471", "wc", "44.0", "--on", "2024-06-14")
+    stocked("cylinder", "measure", "NCI/A4471", "ree", "31.2", "--on", "2024-06-14")
+    history = stocked("cylinder", "measurements", "NCI/A4471").output
+    assert "water_capacity" in history
+    assert "rejection_limit" in history
+
+
+def test_nothing_measured(stocked: Invoke) -> None:
+    assert "nothing has been measured" in stocked("cylinder", "measurements", "NCI/A4471").output
+
+
+def test_a_measurement_the_shop_does_not_take(stocked: Invoke) -> None:
+    stocked("cylinder", "measure", "NCI/A4471", "height", "10", expect=2)
