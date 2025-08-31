@@ -68,3 +68,35 @@ def test_writing_twice_over_the_same_directory(shop_book: Book, tmp_path: Path) 
     pack.write(shop_book, tmp_path / "pack", FIRST, LAST, TODAY)
     result = pack.write(shop_book, tmp_path / "pack", FIRST, LAST, TODAY)
     assert result.cylinders == 1
+
+
+def test_a_pack_for_one_account(shop_book: Book, tmp_path: Path) -> None:
+    from starstamp.model.owner import OwnerAccount
+    from starstamp.store.cylinders import CylinderRepository
+    from starstamp.store.owners import OwnerRepository
+
+    owners = OwnerRepository(shop_book.connection)
+    owners.add(OwnerAccount(code="FIRE7", name="Sanpete Fire", opened_on=date(2020, 1, 1)))
+    other = stock(shop_book, make_cylinder(key=CylinderKey("PST", "B12")))
+    CylinderRepository(shop_book.connection).transfer(
+        other, owners.id_of("FIRE7"), date(2024, 6, 1)
+    )
+    requalify(shop_book)
+    requalify(shop_book, key=other)
+
+    result = pack.write(shop_book, tmp_path / "pack", FIRST, LAST, TODAY, owner_code="WELD1")
+    assert result.cylinders == 1
+    packets = sorted((tmp_path / "pack" / "packets").glob("*.txt"))
+    assert [path.name for path in packets] == ["NCI-A4471.txt"]
+    index = (tmp_path / "pack" / "index.txt").read_text()
+    assert "audit pack for WELD1" in index
+    records = (tmp_path / "pack" / "records-of-test.csv").read_text()
+    assert "PST/B12" not in records
+    assert "NCI/A4471" in records
+
+
+def test_the_cylinder_sheet_is_narrowed_too(shop_book: Book, tmp_path: Path) -> None:
+    requalify(shop_book)
+    pack.write(shop_book, tmp_path / "pack", FIRST, LAST, TODAY, owner_code="WELD1")
+    listing = (tmp_path / "pack" / "cylinders.csv").read_text()
+    assert "NCI/A4471" in listing

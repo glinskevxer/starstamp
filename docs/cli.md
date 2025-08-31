@@ -728,6 +728,7 @@ Write an audit pack to a directory: a packet per cylinder and the sheets.
   - `DIRECTORY` (argument)
   - `--from` first day of the period
   - `--to` last day of the period
+  - `--owner` narrow it to one account's cylinders
 
 ### `starstamp report packet`
 

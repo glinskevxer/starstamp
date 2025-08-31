@@ -305,3 +305,22 @@ def test_the_account_page(tested: Invoke) -> None:
     out = tested("--today", "2024-07-01", "report", "account", "weld1").output
     assert "WELD1 Cascade Welding Supply" in out
     assert "cylinders" in out
+
+
+def test_a_pack_for_one_account(tested: Invoke, tmp_path: Path) -> None:
+    target = tmp_path / "pack"
+    out = tested(
+        "--today",
+        "2024-07-01",
+        "report",
+        "pack",
+        str(target),
+        "--from",
+        "2024-06-01",
+        "--to",
+        "2024-06-30",
+        "--owner",
+        "weld1",
+    ).output
+    assert "files for 1 cylinders" in out
+    assert "audit pack for WELD1" in (target / "index.txt").read_text()
