@@ -324,3 +324,9 @@ def test_a_pack_for_one_account(tested: Invoke, tmp_path: Path) -> None:
     ).output
     assert "files for 1 cylinders" in out
     assert "audit pack for WELD1" in (target / "index.txt").read_text()
+
+
+def test_the_specification_report(tested: Invoke) -> None:
+    out = tested("report", "specifications").output
+    assert "DOT-3AA2015" in out
+    assert "we can do" in out

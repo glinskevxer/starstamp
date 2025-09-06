@@ -112,6 +112,9 @@ def build(book: Book, key: CylinderKey) -> Life:
                 Entry(lot.returned_on, "returned", f"went back on {lot.number}", lot.number)
             )
 
+    for day, kind, value, source in cylinders.measurements(key):
+        entries.append(Entry(day, "measured", f"{kind} {value} from {source}", None))
+
     for day, thousandths, source in cylinders.wall_readings(key):
         entries.append(Entry(day, "wall", f"{thousandths / 1000:.3f} in from {source}", None))
 

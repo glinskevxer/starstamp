@@ -26,6 +26,7 @@ from starstamp.reporting import (
     gases,
     pack,
     rig,
+    specifications,
     technician,
     throughput,
     unbilled,
@@ -372,3 +373,14 @@ def account_report(shop: ShopContext, owner: str, month: str | None) -> None:
     with shop.open() as handle:
         page = account_page.build(handle, owner, window.first, window.last, shop.today)
     click.echo(account_page.render(page))
+
+
+@report.command("specifications")
+@click.option("--on", "day", default=None, help="the day to read it for")
+@pass_shop
+def specification_report(shop: ShopContext, day: str | None) -> None:
+    """The fleet by specification, next to what the shop may do to each."""
+    when = resolve_day(day, shop)
+    with shop.open() as handle:
+        built = specifications.build(handle, when)
+    click.echo(specifications.render(built))

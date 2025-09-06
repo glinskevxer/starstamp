@@ -146,3 +146,14 @@ def test_the_kinds_count_everything(shop_book: Book) -> None:
         KEY, NITROGEN, date(2024, 6, 25), "JT7", pressure=Pressure(2015)
     )
     assert life.build(shop_book, KEY).kinds() == {"fill": 1, "test": 1}
+
+
+def test_measurements_land_on_the_timeline(shop_book: Book) -> None:
+    from starstamp.store.cylinders import CylinderRepository
+
+    CylinderRepository(shop_book.connection).measure(
+        KEY, "tare", 11800, date(2024, 6, 11), "shop scale"
+    )
+    built = life.build(shop_book, KEY)
+    assert built.entries[0].kind == "measured"
+    assert "tare 11800 from shop scale" in built.entries[0].detail

@@ -745,6 +745,12 @@ How the test systems are doing.
   - `--from` first day of the window
   - `--to` last day of the window
 
+### `starstamp report specifications`
+
+The fleet by specification, next to what the shop may do to each.
+
+  - `--on` the day to read it for
+
 ### `starstamp report technicians`
 
 What each person got through, and who sits away from the middle.
@@ -1015,4 +1021,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_130 commands._
+_131 commands._
