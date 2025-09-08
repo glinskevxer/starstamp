@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 
 from starstamp import __version__
-from starstamp.cli import fleet
+from starstamp.cli import fleet, money
 from starstamp.cli.accounts import account
 from starstamp.cli.billing import contract, invoice, price
 from starstamp.cli.check import check, doctor, stats
@@ -229,6 +229,8 @@ cli.add_command(rig)
 cli.add_command(fill)
 cli.add_command(restate)
 cli.add_command(report)
+# money.py hangs its commands off the same group, so importing it registers them.
+_ = money.report
 cli.add_command(lot)
 cli.add_command(price)
 cli.add_command(invoice)

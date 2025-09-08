@@ -102,3 +102,22 @@ def test_the_read_only_commands_run_against_a_demo_book(path: list[str], run: In
     run("--today", "2025-06-08", "demo", "--cylinders", "8")
     result = run("--today", "2025-06-08", *path, expect=None)
     assert result.exit_code in {0, 7, 8}, result.output
+
+
+def test_the_money_reports_are_on_the_same_group() -> None:
+    """Splitting the module must not move the commands."""
+    names = {" ".join(path) for path, _ in COMMANDS}
+    for name in (
+        "report close",
+        "report forecast",
+        "report unbilled",
+        "report account",
+        "report cycle",
+    ):
+        assert name in names
+
+
+def test_the_work_reports_are_still_there() -> None:
+    names = {" ".join(path) for path, _ in COMMANDS}
+    for name in ("report throughput", "report bench", "report pack", "report day"):
+        assert name in names
