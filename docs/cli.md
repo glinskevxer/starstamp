@@ -1013,6 +1013,13 @@ Sign somebody off for one more method.
   - `BADGE` (argument)
   - `METHOD` (argument)
 
+### `starstamp today`
+
+What is on the bench, what the day can take, and what is owed.
+
+  - `--on` pretend it is this day
+  - `--quiet` leave out the bench sheet
+
 ### `starstamp vacuum`
 
 Rebuild the file and give back the space deletes left behind.
@@ -1021,4 +1028,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_131 commands._
+_132 commands._

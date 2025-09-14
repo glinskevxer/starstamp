@@ -29,6 +29,7 @@ from starstamp.cli.restate import restate
 from starstamp.cli.schedule import book
 from starstamp.cli.settings import setting
 from starstamp.cli.shopfloor import facility, rig, tech
+from starstamp.cli.today import today
 from starstamp.errors import (
     ConflictError,
     NotFoundError,
@@ -249,6 +250,7 @@ cli.add_command(restore)
 cli.add_command(verify)
 cli.add_command(vacuum)
 cli.add_command(setting)
+cli.add_command(today)
 
 
 def run() -> int:

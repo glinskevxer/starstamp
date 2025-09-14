@@ -17,6 +17,7 @@ This is the book the shop keeps. One SQLite file, one command line.
 
 Then look at it:
 
+    starstamp --book shop.sqlite3 today
     starstamp --book shop.sqlite3 about
     starstamp --book shop.sqlite3 report close
     starstamp --book shop.sqlite3 report bench
