@@ -4,9 +4,24 @@ build-backend = "hatchling.build"
 
 [project]
 name = "starstamp"
-version = "0.1.0"
+version = "1.0.0"
 description = "Requalification shop records for DOT compressed gas cylinders"
+readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Wasatch Cylinder Service" }]
+keywords = ["cylinder", "requalification", "hydrostatic", "compressed gas", "DOT"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Manufacturing",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business",
+  "Typing :: Typed",
+]
 dependencies = ["click==8.1.8"]
 
 [project.optional-dependencies]
@@ -18,6 +33,9 @@ dev = [
   "mypy==1.15.0",
   "hypothesis==6.125.3",
 ]
+
+[project.urls]
+Documentation = "https://github.com/glinskevxer/starstamp/blob/main/docs/cli.md"
 
 [project.scripts]
 starstamp = "starstamp.cli.main:run"
