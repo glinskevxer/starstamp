@@ -330,3 +330,9 @@ def test_the_specification_report(tested: Invoke) -> None:
     out = tested("report", "specifications").output
     assert "DOT-3AA2015" in out
     assert "we can do" in out
+
+
+def test_the_method_report(tested: Invoke) -> None:
+    out = tested("report", "methods", "--from", "2024-06-01", "--to", "2024-06-30").output
+    assert "volumetric" in out
+    assert "not used:" in out

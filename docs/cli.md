@@ -714,6 +714,13 @@ The fleet and the work, cut by what is in the cylinders.
   - `--from` first day of the window
   - `--to` last day of the window
 
+### `starstamp report methods`
+
+What the shop did, method by method.
+
+  - `--from` first day of the window
+  - `--to` last day of the window
+
 ### `starstamp report ownership`
 
 Cylinders that changed hands in a window.
@@ -1028,4 +1035,4 @@ Rebuild the file and give back the space deletes left behind.
 
 Ask the file whether it is sound.
 
-_132 commands._
+_133 commands._

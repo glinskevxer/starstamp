@@ -16,6 +16,7 @@ from starstamp.reporting import (
     daybook,
     fleet,
     gases,
+    methods,
     pack,
     rig,
     specifications,
@@ -311,3 +312,16 @@ def specification_report(shop: ShopContext, day: str | None) -> None:
     with shop.open() as handle:
         built = specifications.build(handle, when)
     click.echo(specifications.render(built))
+
+
+@report.command("methods")
+@click.option("--from", "first", default=None, help="first day of the window")
+@click.option("--to", "last", default=None, help="last day of the window")
+@pass_shop
+def method_report(shop: ShopContext, first: str | None, last: str | None) -> None:
+    """What the shop did, method by method."""
+    window = resolve_window(shop.today, first=first, last=last)
+    with shop.open() as handle:
+        mix = methods.build(handle, window.first, window.last)
+    click.echo(str(window))
+    click.echo(methods.render(mix))
