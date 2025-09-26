@@ -23,8 +23,9 @@ Then look at it:
     starstamp --book shop.sqlite3 report bench
     starstamp --book shop.sqlite3 doctor
 
-Every command is listed in [docs/cli.md](docs/cli.md), which is generated from
-the commands themselves and checked in the build.
+Every command is listed in [docs/cli.md](docs/cli.md), and the reasoning
+behind the rules is collected in [docs/domain.md](docs/domain.md). Both are
+generated from the code and checked in the build.
 
 ## A day at the bench
 

@@ -37,6 +37,8 @@ jobs:
         run: python -m starstamp.tools.generate_cli_reference --check
       - name: the repository's own house rules
         run: python -m starstamp.tools.check_repo
+      - name: the domain reference matches the rules
+        run: python -m starstamp.tools.generate_domain_reference --check
 
   types:
     runs-on: ubuntu-latest

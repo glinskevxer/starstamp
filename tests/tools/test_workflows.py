@@ -52,6 +52,7 @@ def test_the_gate_the_shop_runs_locally_is_in_the_build() -> None:
         "starstamp.tools.check_workflow",
         "generate_cli_reference --check",
         "starstamp.tools.check_repo",
+        "generate_domain_reference --check",
     ):
         assert step in ci, step
 
