@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -19,15 +21,18 @@ TODAY = date(2025, 6, 8)
 
 
 @pytest.fixture
-def demo(tmp_path: object) -> Book:
-    from pathlib import Path
+def demo(tmp_path: Path) -> Iterator[Book]:
+    """A demo book that is closed again when the test is done.
 
-    assert isinstance(tmp_path, Path)
-    handle = open_book(tmp_path / "demo.sqlite3")
-    handle.__enter__()
-    migrate(handle.connection)
-    seed(handle, TODAY)
-    return handle
+    The book has to stay open across the whole test, and a fixture that opens
+    one and never closes it leaves the connection to the collector. Python
+    3.13 turns that into an unraisable ResourceWarning, which this suite reads
+    as an error, so every fixture here yields.
+    """
+    with open_book(tmp_path / "demo.sqlite3") as handle:
+        migrate(handle.connection)
+        seed(handle, TODAY)
+        yield handle
 
 
 def test_the_demo_has_a_fleet(demo: Book) -> None:
@@ -72,10 +77,7 @@ def test_every_cylinder_has_a_valve_that_suits_its_gas(demo: Book) -> None:
         assert matches(cylinder, cylinder.service), str(cylinder.key)
 
 
-def test_seeding_a_smaller_shop(tmp_path: object) -> None:
-    from pathlib import Path
-
-    assert isinstance(tmp_path, Path)
+def test_seeding_a_smaller_shop(tmp_path: Path) -> None:
     with open_book(tmp_path / "small.sqlite3") as handle:
         migrate(handle.connection)
         result = seed(handle, TODAY, cylinders=8)

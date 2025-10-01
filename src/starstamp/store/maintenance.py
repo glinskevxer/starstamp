@@ -69,8 +69,15 @@ def backup(book: Book, target: Path, *, overwrite: bool = False) -> BackupResult
         nonlocal pages
         pages = total
 
-    with sqlite3.connect(target) as destination:
+    destination = sqlite3.connect(target)
+    try:
+        # A `with` on a connection commits; it does not close. On 3.13 the
+        # connection that is then left to the collector raises an unraisable
+        # ResourceWarning, and on any version it holds the file open on
+        # Windows until the collector gets to it.
         book.connection.backup(destination, progress=count)
+    finally:
+        destination.close()
     return BackupResult(target, target.stat().st_size, pages)
 
 

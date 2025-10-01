@@ -11,6 +11,7 @@ other test uses.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -32,11 +33,16 @@ TESTS_EACH = 3
 
 
 @pytest.fixture(scope="module")
-def big_book(tmp_path_factory: pytest.TempPathFactory) -> Book:
+def big_book(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Book]:
     path: Path = tmp_path_factory.mktemp("scale") / "shop.sqlite3"
-    handle = open_book(path)
-    handle.__enter__()
-    migrate(handle.connection)
+    with open_book(path) as handle:
+        migrate(handle.connection)
+        _fill(handle)
+        yield handle
+
+
+def _fill(handle: Book) -> None:
+    """Put the fleet and its history in, one cylinder at a time."""
     owners = OwnerRepository(handle.connection)
     owners.add(make_owner())
     owner_id = owners.id_of("WELD1")
@@ -61,7 +67,6 @@ def big_book(tmp_path_factory: pytest.TempPathFactory) -> Book:
                 ),
                 cylinder_id,
             )
-    return handle
 
 
 def plan(book: Book, sql: str, parameters: tuple[object, ...]) -> str:

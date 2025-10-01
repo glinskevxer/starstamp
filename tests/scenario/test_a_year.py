@@ -9,7 +9,9 @@ does not trust either.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -28,15 +30,11 @@ MONTH = StampedMonth(2025, 6)
 
 
 @pytest.fixture
-def a_year(tmp_path: object) -> Book:
-    from pathlib import Path
-
-    assert isinstance(tmp_path, Path)
-    handle = open_book(tmp_path / "year.sqlite3")
-    handle.__enter__()
-    migrate(handle.connection)
-    seed(handle, TODAY, cylinders=40)
-    return handle
+def a_year(tmp_path: Path) -> Iterator[Book]:
+    with open_book(tmp_path / "year.sqlite3") as handle:
+        migrate(handle.connection)
+        seed(handle, TODAY, cylinders=40)
+        yield handle
 
 
 def test_the_throughput_and_the_close_agree(a_year: Book) -> None:

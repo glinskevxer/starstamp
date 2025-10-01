@@ -9,6 +9,7 @@ text rather than a traceback.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 
@@ -46,20 +47,18 @@ KEY = CylinderKey("NCI", "D0000")
 
 
 @pytest.fixture
-def empty(tmp_path: Path) -> Book:
-    handle = open_book(tmp_path / "empty.sqlite3")
-    handle.__enter__()
-    migrate(handle.connection)
-    return handle
+def empty(tmp_path: Path) -> Iterator[Book]:
+    with open_book(tmp_path / "empty.sqlite3") as handle:
+        migrate(handle.connection)
+        yield handle
 
 
 @pytest.fixture
-def busy(tmp_path: Path) -> Book:
-    handle = open_book(tmp_path / "busy.sqlite3")
-    handle.__enter__()
-    migrate(handle.connection)
-    seed(handle, TODAY, cylinders=12)
-    return handle
+def busy(tmp_path: Path) -> Iterator[Book]:
+    with open_book(tmp_path / "busy.sqlite3") as handle:
+        migrate(handle.connection)
+        seed(handle, TODAY, cylinders=12)
+        yield handle
 
 
 def every_report(book: Book) -> list[str]:
