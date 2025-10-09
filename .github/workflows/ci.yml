@@ -107,27 +107,7 @@ jobs:
           cache: pip
       - run: pip install .
       - name: a day in the shop, through the installed console script
-        run: |
-          set -e
-          cd "$(mktemp -d)"
-          starstamp --book shop.sqlite3 init
-          starstamp --book shop.sqlite3 account add WELD1 "Cascade Welding Supply" --opened 2019-04-01
-          starstamp --book shop.sqlite3 facility add A419 "Wasatch Cylinder Service" \
-            --from 2021-05-01 --until 2026-04-30 --methods volumetric,visual
-          starstamp --book shop.sqlite3 tech add JT7 "Jesse Tovar" \
-            --methods volumetric,visual --from 2022-03-01
-          for pair in "calibrated cylinder:CC-1" "gauge:PG-1" "burette:EB-1"; do
-            starstamp --book shop.sqlite3 rig certify WJ-1 "${pair%%:*}" \
-              --serial "${pair##*:}" --issued 2024-01-15 --until 2029-01-15 --by "Rocky Mountain"
-          done
-          starstamp --book shop.sqlite3 rig check WJ-1 40.0 40.1 --on 2024-06-12
-          starstamp --book shop.sqlite3 cylinder register NCI/A4471 --owner WELD1 \
-            --spec DOT-3AA2015 --dom 06-98 --service N2 --ree 125.0 --wall 0.220 --on 2024-06-11
-          starstamp --book shop.sqlite3 requal run NCI/A4471 --tech JT7 --system WJ-1 \
-            --on 2024-06-12 --applied 3358 --total 110.0 --permanent 2.0
-          starstamp --book shop.sqlite3 --today 2024-07-01 fill check NCI/A4471
-          starstamp --book shop.sqlite3 report packet NCI/A4471
-          starstamp --book shop.sqlite3 about
+        run: scripts/smoke.sh "$(mktemp -d)"
 
   package:
     runs-on: ubuntu-latest

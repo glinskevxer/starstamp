@@ -1,5 +1,9 @@
 """Check every starstamp command line in the build against the real CLI.
 
+It reads the workflow files and the scripts they call, because the chain the
+build runs lives in scripts/smoke.sh and a checker that only read the workflow
+would have nothing left to check.
+
 This exists because of a class of mistake nothing else here catches. Every
 test in the suite calls the command line with its arguments already in the
 right shape, so a workflow step that puts a group option after the subcommand
@@ -24,6 +28,8 @@ import click
 from starstamp.cli.main import cli
 
 WORKFLOWS = Path(".github/workflows")
+SCRIPTS = Path("scripts")
+DEFAULT_ROOTS = (WORKFLOWS, SCRIPTS)
 _INVOCATION = re.compile(r"(?<![\w/-])starstamp\s")
 _PLACEHOLDER = re.compile(r"\$\{\{.*?\}\}|\$[A-Za-z_{(]")
 
@@ -141,15 +147,16 @@ def check_path(path: Path) -> list[Problem]:
 
 
 def run(argv: list[str] | None = None) -> int:
-    roots = [Path(item) for item in (argv or [])] or [WORKFLOWS]
+    roots = [Path(item) for item in (argv or [])] or list(DEFAULT_ROOTS)
     files: list[Path] = []
     for root in roots:
         if root.is_dir():
-            files.extend(sorted(root.glob("*.yml")) + sorted(root.glob("*.yaml")))
+            for pattern in ("*.yml", "*.yaml", "*.sh"):
+                files.extend(sorted(root.glob(pattern)))
         elif root.exists():
             files.append(root)
     if not files:
-        print("no workflow files to check", file=sys.stderr)
+        print("no build files to check", file=sys.stderr)
         return 0
 
     problems: list[Problem] = []
@@ -159,7 +166,7 @@ def run(argv: list[str] | None = None) -> int:
         checked += len(lines)
         problems.extend(check_path(path))
 
-    print(f"{len(files)} workflow files, {checked} starstamp command lines")
+    print(f"{len(files)} build files, {checked} starstamp command lines")
     for problem in problems:
         print(str(problem), file=sys.stderr)
     return 1 if problems else 0

@@ -5,14 +5,23 @@ import pytest
 from starstamp.tools.check_workflow import check_line, command_lines, join_continuations, run
 
 
-def test_the_shipped_workflow_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
-    assert run([".github/workflows"]) == 0
+def test_the_shipped_build_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
+    assert run([]) == 0
+    out = capsys.readouterr().out
+    assert "starstamp command lines" in out
+    assert "build files" in out
+
+
+def test_it_finds_the_command_lines_in_the_smoke_script() -> None:
+    text = Path("scripts/smoke.sh").read_text()
+    assert len(command_lines(text)) >= 8
+
+
+def test_it_reads_the_scripts_as_well_as_the_workflows(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert run(["scripts"]) == 0
     assert "starstamp command lines" in capsys.readouterr().out
-
-
-def test_it_finds_the_command_lines_in_the_shipped_workflow() -> None:
-    text = Path(".github/workflows/ci.yml").read_text()
-    assert len(command_lines(text)) >= 10
 
 
 def test_continuations_are_folded() -> None:
@@ -73,7 +82,7 @@ def test_a_bad_workflow_file_is_reported(
 
 def test_nothing_to_check(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert run([str(tmp_path / "missing")]) == 0
-    assert "no workflow files" in capsys.readouterr().err
+    assert "no build files" in capsys.readouterr().err
 
 
 def test_a_directory_of_workflows(tmp_path: Path) -> None:

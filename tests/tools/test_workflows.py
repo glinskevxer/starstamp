@@ -40,6 +40,13 @@ def test_every_job_checks_out_and_sets_up_python() -> None:
     assert ci.count("actions/setup-python@v5") == len(jobs)
 
 
+def test_the_build_runs_the_checked_in_smoke_script() -> None:
+    """The chain the build runs has to be the one the tests run."""
+    ci = workflow("ci.yml")
+    assert "scripts/smoke.sh" in ci
+    assert "requal run" not in ci
+
+
 def test_the_gate_the_shop_runs_locally_is_in_the_build() -> None:
     ci = workflow("ci.yml")
     for step in (
