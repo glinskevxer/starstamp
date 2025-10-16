@@ -1,6 +1,6 @@
 """The house rules this repository keeps, checked mechanically.
 
-Three of them, all of which have been broken here at least once:
+Four of them, all of which have been broken here at least once:
 
 Every module says what it is for in its first line. A module with no docstring
 is one somebody added in a hurry, and this package's docstrings are where the
@@ -12,6 +12,12 @@ somebody deferred and nobody came back to.
 Every source package has a matching test package. It does not check that every
 module is tested, which would be a lie dressed as a number; it checks that a
 whole area of the code has not appeared with no tests beside it at all.
+
+Every file a generator writes is declared as generated. An undeclared one is
+counted as though somebody typed it, which skews what the host reports the
+repository is written in, and it reads in review as hand work. The rule finds
+the generators rather than naming their outputs, so a third one cannot be
+added without either the declaration or a deliberate decision to skip it.
 """
 
 from __future__ import annotations
@@ -23,6 +29,8 @@ from pathlib import Path
 
 SOURCE = Path("src/starstamp")
 TESTS = Path("tests")
+TOOLS = SOURCE / "tools"
+ATTRIBUTES = Path(".gitattributes")
 MARKERS = ("TODO", "FIXME", "XXX", "HACK")
 EXEMPT_FROM_TESTS = {"starstamp", "cli", "text", "tools"}
 
@@ -77,9 +85,67 @@ def packages_without_tests(source: Path = SOURCE, tests: Path = TESTS) -> list[C
     return found
 
 
+def generated_files(tools: Path = TOOLS) -> list[str]:
+    """The path each generator writes, read off the generator itself.
+
+    Read rather than imported: this runs over whatever directory it is given,
+    and a checker that imports the thing it is checking can be fooled by an
+    import that does work of its own.
+    """
+    targets: list[str] = []
+    for path in sorted(tools.glob("generate_*.py")):
+        tree = ast.parse(path.read_text())
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            names = [n.id for n in node.targets if isinstance(n, ast.Name)]
+            if "TARGET" not in names:
+                continue
+            value = node.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                targets.append(value.value)
+            elif isinstance(value, ast.Call) and value.args:
+                first = value.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    targets.append(first.value)
+    return targets
+
+
+def declarations(attributes: Path = ATTRIBUTES) -> dict[str, str]:
+    """Read .gitattributes as a mapping of path to the attributes set on it."""
+    found: dict[str, str] = {}
+    if not attributes.exists():
+        return found
+    for line in attributes.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        pattern, _, rest = stripped.partition(" ")
+        found[pattern] = rest.strip()
+    return found
+
+
+def undeclared_generated_files(
+    tools: Path = TOOLS, attributes: Path = ATTRIBUTES
+) -> list[Complaint]:
+    found: list[Complaint] = []
+    declared = declarations(attributes)
+    for target in generated_files(tools):
+        if "linguist-generated=true" not in declared.get(target, ""):
+            found.append(
+                Complaint("generated", target, "not declared linguist-generated in .gitattributes")
+            )
+    return found
+
+
 def run(argv: list[str] | None = None) -> int:
     _ = argv
-    complaints = missing_docstrings() + leftover_markers() + packages_without_tests()
+    complaints = (
+        missing_docstrings()
+        + leftover_markers()
+        + packages_without_tests()
+        + undeclared_generated_files()
+    )
     counted = len(modules(SOURCE)) + len(modules(TESTS))
     print(f"{counted} modules checked")
     for complaint in complaints:

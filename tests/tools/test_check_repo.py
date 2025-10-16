@@ -4,11 +4,14 @@ import pytest
 
 from starstamp.tools.check_repo import (
     Complaint,
+    declarations,
+    generated_files,
     leftover_markers,
     missing_docstrings,
     modules,
     packages_without_tests,
     run,
+    undeclared_generated_files,
 )
 
 
@@ -72,3 +75,40 @@ def test_modules_skips_the_caches(tmp_path: Path) -> None:
 def test_a_complaint_reads_as_a_line() -> None:
     complaint = Complaint("docstring", "src/x.py", "no module docstring")
     assert str(complaint) == "docstring: src/x.py: no module docstring"
+
+
+def test_the_generators_are_found_by_looking_not_by_naming() -> None:
+    """The rule reads the generators, so a third one is covered by arriving."""
+    assert sorted(generated_files()) == ["docs/cli.md", "docs/domain.md"]
+
+
+def test_every_generated_file_is_declared_as_generated() -> None:
+    assert undeclared_generated_files() == []
+
+
+def test_the_declarations_are_read_off_the_file_that_ships() -> None:
+    declared = declarations()
+    assert declared["docs/cli.md"] == "linguist-generated=true"
+    assert declared["docs/domain.md"] == "linguist-generated=true"
+
+
+def test_an_undeclared_generated_file_is_found(tmp_path: Path) -> None:
+    """The positive control. Take the declaration away and the rule complains."""
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    (tools / "generate_thing.py").write_text('"""A generator."""\n\nTARGET = "docs/thing.md"\n')
+    attributes = tmp_path / ".gitattributes"
+    attributes.write_text("docs/other.md linguist-generated=true\n")
+    found = undeclared_generated_files(tools, attributes)
+    assert len(found) == 1
+    assert "docs/thing.md" in str(found[0])
+
+
+def test_a_missing_attributes_file_means_nothing_is_declared(tmp_path: Path) -> None:
+    assert declarations(tmp_path / "absent") == {}
+
+
+def test_comments_and_blank_lines_are_not_declarations(tmp_path: Path) -> None:
+    attributes = tmp_path / ".gitattributes"
+    attributes.write_text("# a comment\n\ndocs/cli.md linguist-generated=true\n")
+    assert declarations(attributes) == {"docs/cli.md": "linguist-generated=true"}
